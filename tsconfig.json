@@ -25,5 +25,14 @@
     }
   },
   "include": ["src/**/*", "prisma/**/*", "test/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/modules/audit/**",
+    "src/modules/auth/**",
+    "src/modules/users/**",
+    "src/modules/organizations/**",
+    "src/modules/roles/**",
+    "src/modules/permissions/**"
+  ]
 }

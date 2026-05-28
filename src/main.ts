@@ -42,12 +42,7 @@ async function bootstrap() {
       { type: 'http', scheme: 'bearer', bearerFormat: 'JWT', name: 'Authorization' },
       'bearer',
     )
-    .addTag('Auth')
-    .addTag('Users')
-    .addTag('Organizations')
-    .addTag('Roles')
-    .addTag('Permissions')
-    .addTag('Audit')
+    .addTag('Auth Maria (paciente)')
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('docs', app, document, {

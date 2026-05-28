@@ -2,14 +2,14 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerModule } from '@nestjs/throttler';
+
 import { validateEnv } from './shared/config/env.validation';
 import { SharedModule } from './shared/shared.module';
-import { AuthModule } from './modules/auth/auth.module';
-import { UsersModule } from './modules/users/users.module';
-import { OrganizationsModule } from './modules/organizations/organizations.module';
-import { RolesModule } from './modules/roles/roles.module';
-import { PermissionsModule } from './modules/permissions/permissions.module';
-import { AuditModule } from './modules/audit/audit.module';
+import { AuthMariaModule } from './modules/auth-maria/auth-maria.module';
+
+// NOTE: módulos do CRM (auth, users, organizations, roles, permissions, audit)
+// foram escritos pra um schema anterior em camelCase inglês. Estão desabilitados
+// até serem refatorados pro schema atual em Portuguese snake_case.
 
 @Module({
   imports: [
@@ -20,12 +20,7 @@ import { AuditModule } from './modules/audit/audit.module';
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     EventEmitterModule.forRoot(),
     SharedModule,
-    AuditModule,
-    PermissionsModule,
-    UsersModule,
-    OrganizationsModule,
-    RolesModule,
-    AuthModule,
+    AuthMariaModule,
   ],
 })
 export class AppModule {}

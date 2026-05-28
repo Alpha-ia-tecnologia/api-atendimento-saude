@@ -7,155 +7,341 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum UserStatus {
-  ACTIVE
-  INACTIVE
-  BLOCKED
+// ===================================================================
+// ENUMS
+// ===================================================================
+
+enum TipoPerfilCrm {
+  ADMIN
+  SUPERVISOR
+  USUARIO
 }
 
-enum OrganizationStatus {
-  ACTIVE
-  INACTIVE
+enum TipoPerfilMaria {
+  ADMIN
+  SOLICITANTE
 }
 
-enum RoleStatus {
-  ACTIVE
-  INACTIVE
+enum TipoEspecialidade {
+  CONSULTA
+  EXAME
+  OUTRO
 }
 
-model User {
-  id             String     @id @default(uuid()) @db.Uuid
-  name           String
-  email          String     @unique
-  passwordHash   String
-  status         UserStatus @default(ACTIVE)
-  organizationId String?    @db.Uuid
-  lastLoginAt    DateTime?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
-  deletedAt      DateTime?
+enum StatusSolicitacao {
+  SOLICITADA
+  AGENDADA
+  NAO_APROVADA
+  REALIZADA
+  CANCELADA
+  NAO_COMPARECEU
+}
 
-  organization  Organization?  @relation(fields: [organizationId], references: [id])
-  roles         UserRole[]
-  refreshTokens RefreshToken[]
-  auditLogs     AuditLog[]
+enum TipoAnexo {
+  IMAGEM
+  DOCUMENTO
+  OUTRO
+}
 
-  @@index([organizationId])
+/// Indica se a solicitação é pro próprio solicitante ou pra outra pessoa.
+/// - EU    : paciente == solicitante (dados do paciente vêm do UsuarioMaria)
+/// - OUTRA : paciente != solicitante (dados do paciente vêm do chat)
+enum ParaQuem {
+  EU
+  OUTRA
+}
+
+/// Por qual canal a solicitação chegou ao sistema.
+enum OrigemSolicitacao {
+  APP
+  WEB
+  WHATSAPP
+  CRM
+}
+
+enum CanalNotificacao {
+  WHATSAPP
+  PUSH
+  SMS
+  EMAIL
+}
+
+enum TipoNotificacao {
+  SOLICITACAO_CRIADA
+  SOLICITACAO_AGENDADA
+  SOLICITACAO_NAO_APROVADA
+  SOLICITACAO_REALIZADA
+  SOLICITACAO_CANCELADA
+  OUTRO
+}
+
+enum StatusNotificacao {
+  PENDENTE
+  ENVIADA
+  ENTREGUE
+  LIDA
+  FALHA
+}
+
+// ===================================================================
+// USUÁRIOS
+// ===================================================================
+
+model UsuarioCrm {
+  id            String        @id @default(uuid()) @db.Uuid
+  email         String        @unique
+  senhaHash     String        @map("senha_hash")
+  nomeCompleto  String        @map("nome_completo")
+  tipoPerfil    TipoPerfilCrm @default(USUARIO) @map("tipo_perfil")
+  ativo         Boolean       @default(true)
+  ultimoLoginEm DateTime?     @map("ultimo_login_em")
+  criadoEm      DateTime      @default(now()) @map("criado_em")
+  atualizadoEm  DateTime      @updatedAt @map("atualizado_em")
+  excluidoEm    DateTime?     @map("excluido_em")
+
+  solicitacoesComoAgente Solicitacao[]  @relation("SolicitacoesAgenteCrm")
+  refreshTokens          RefreshToken[]
+  auditLogs              AuditLog[]
+
+  @@index([tipoPerfil])
+  @@index([ativo])
+  @@index([excluidoEm])
+  @@map("usuarios_crm")
+}
+
+model UsuarioMaria {
+  id             String          @id @default(uuid()) @db.Uuid
+  nome           String
+  cpf            String          @unique @db.VarChar(11)
+  dataNascimento DateTime        @map("data_nascimento") @db.Date
+  endereco       String?
+  numeroWhatsapp String          @map("numero_whatsapp")
+  fotoPerfilUrl  String?         @map("foto_perfil_url")
+  tipoPerfil     TipoPerfilMaria @default(SOLICITANTE) @map("tipo_perfil")
+  ativo          Boolean         @default(true)
+  criadoEm       DateTime        @default(now()) @map("criado_em")
+  atualizadoEm   DateTime        @updatedAt @map("atualizado_em")
+
+  preferenciasAcessibilidade  PreferenciasAcessibilidade?
+  solicitacoesComoSolicitante Solicitacao[]
+  anexosEnviados              SolicitacaoAnexo[]
+  notificacoes                Notificacao[]
+
+  @@index([tipoPerfil])
+  @@index([ativo])
+  @@index([numeroWhatsapp])
+  @@map("usuarios_maria")
+}
+
+model PreferenciasAcessibilidade {
+  usuarioMariaId String   @id @map("usuario_maria_id") @db.Uuid
+  altoContraste  Boolean  @default(false) @map("alto_contraste")
+  escalaFonte    Decimal  @default(1.0) @map("escala_fonte") @db.Decimal(3, 2)
+  narracao       Boolean  @default(false)
+  criadoEm       DateTime @default(now()) @map("criado_em")
+  atualizadoEm   DateTime @updatedAt @map("atualizado_em")
+
+  usuarioMaria UsuarioMaria @relation(fields: [usuarioMariaId], references: [id], onDelete: Cascade)
+
+  @@map("preferencias_acessibilidade")
+}
+
+// ===================================================================
+// CATÁLOGO
+// ===================================================================
+
+model UnidadeSaude {
+  id           String   @id @default(uuid()) @db.Uuid
+  nome         String
+  endereco     String?
+  bairro       String?
+  cidade       String?
+  uf           String?  @db.VarChar(2)
+  cep          String?  @db.VarChar(8)
+  latitude     Decimal? @db.Decimal(10, 7)
+  longitude    Decimal? @db.Decimal(10, 7)
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  solicitacoes Solicitacao[]
+
+  @@index([ativo])
+  @@map("unidades_saude")
+}
+
+model Especialidade {
+  id           String            @id @default(uuid()) @db.Uuid
+  nome         String            @unique
+  tipo         TipoEspecialidade
+  /// Descrição curta exibida no chatbot (ex: "Coração e sistema circulatório").
+  descricao    String?
+  /// Nome do ícone Lucide (ex: "heart", "stethoscope", "droplet"). O front
+  /// mapeia esse string pro componente real. Mantém o DB leve e portável.
+  icone        String?
+  disponivel   Boolean           @default(true)
+  ordem        Int               @default(0)
+  criadoEm     DateTime          @default(now()) @map("criado_em")
+  atualizadoEm DateTime          @updatedAt @map("atualizado_em")
+
+  solicitacoes Solicitacao[]
+
+  @@index([tipo])
+  @@index([disponivel])
+  @@map("especialidades")
+}
+
+// ===================================================================
+// SOLICITAÇÃO
+// ===================================================================
+
+model Solicitacao {
+  id        String @id @default(uuid()) @db.Uuid
+  protocolo String @unique
+
+  // -------- Quem criou a solicitação (usuário autenticado) --------
+  /// Usuário Maria que enviou o pedido. Nullable pra cobrir pedidos
+  /// registrados manualmente pelo CRM sem conta no app.
+  solicitanteId String?       @map("solicitante_id") @db.Uuid
+  solicitante   UsuarioMaria? @relation(fields: [solicitanteId], references: [id], onDelete: SetNull)
+
+  // -------- Pra quem é a solicitação (paciente) --------
+  /// EU: solicitante == paciente. OUTRA: dados vêm do chat.
+  paraQuem ParaQuem @default(EU) @map("para_quem")
+
+  /// Snapshot dos dados do paciente no momento da solicitação.
+  /// Quando paraQuem=EU, são copiados do UsuarioMaria do solicitante;
+  /// quando OUTRA, são preenchidos pelo chat. Manter o snapshot garante
+  /// integridade histórica mesmo se o cidadão atualizar o cadastro depois.
+  pacienteNome             String    @map("paciente_nome")
+  pacienteCpf              String    @map("paciente_cpf") @db.VarChar(11)
+  pacienteDataNascimento   DateTime? @map("paciente_data_nascimento") @db.Date
+  pacienteEndereco         String?   @map("paciente_endereco")
+  pacienteTelefone         String?   @map("paciente_telefone")
+  pacienteTelefoneWhatsapp String?   @map("paciente_telefone_whatsapp")
+
+  // -------- Dados clínicos --------
+  unidadeSaudeId  String?           @map("unidade_saude_id") @db.Uuid
+  especialidadeId String            @map("especialidade_id") @db.Uuid
+  tipo            TipoEspecialidade
+  status          StatusSolicitacao @default(SOLICITADA)
+  /// Por qual canal a solicitação chegou.
+  origem          OrigemSolicitacao @default(APP)
+
+  // -------- Agendamento / atendimento (preenchidos pelo CRM) --------
+  agenteResponsavelCrmId String?   @map("agente_responsavel_crm_id") @db.Uuid
+  motivoNaoAprovacao     String?   @map("motivo_nao_aprovacao")
+  dataSolicitada         DateTime? @map("data_solicitada")
+  dataAgendada           DateTime? @map("data_agendada")
+  dataRealizada          DateTime? @map("data_realizada")
+
+  // -------- Auditoria --------
+  criadoEm     DateTime  @default(now()) @map("criado_em")
+  atualizadoEm DateTime  @updatedAt @map("atualizado_em")
+  enviadoEm    DateTime? @map("enviado_em")
+
+  unidadeSaude      UnidadeSaude?  @relation(fields: [unidadeSaudeId], references: [id], onDelete: SetNull)
+  especialidade     Especialidade  @relation(fields: [especialidadeId], references: [id])
+  agenteResponsavel UsuarioCrm?    @relation("SolicitacoesAgenteCrm", fields: [agenteResponsavelCrmId], references: [id])
+
+  anexos       SolicitacaoAnexo[]
+  notificacoes Notificacao[]
+
+  @@index([solicitanteId])
+  @@index([pacienteCpf])
+  @@index([unidadeSaudeId])
+  @@index([especialidadeId])
+  @@index([agenteResponsavelCrmId])
   @@index([status])
-  @@index([deletedAt])
-  @@map("users")
+  @@index([origem])
+  @@index([paraQuem])
+  @@map("solicitacoes")
 }
 
-model Organization {
-  id        String             @id @default(uuid()) @db.Uuid
-  name      String
-  document  String?            @unique
-  status    OrganizationStatus @default(ACTIVE)
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
-  deletedAt DateTime?
+model SolicitacaoAnexo {
+  id            String    @id @default(uuid()) @db.Uuid
+  solicitacaoId String    @map("solicitacao_id") @db.Uuid
+  url           String
+  tipo          TipoAnexo
+  mimeType      String?   @map("mime_type")
+  tamanhoBytes  Int?      @map("tamanho_bytes")
+  enviadoPorId  String    @map("enviado_por_id") @db.Uuid
+  enviadoEm     DateTime  @default(now()) @map("enviado_em")
 
-  users User[]
+  solicitacao Solicitacao  @relation(fields: [solicitacaoId], references: [id], onDelete: Cascade)
+  enviadoPor  UsuarioMaria @relation(fields: [enviadoPorId], references: [id])
 
+  @@index([solicitacaoId])
+  @@index([enviadoPorId])
+  @@map("solicitacao_anexos")
+}
+
+// ===================================================================
+// NOTIFICAÇÕES
+// ===================================================================
+
+model Notificacao {
+  id             String            @id @default(uuid()) @db.Uuid
+  usuarioMariaId String            @map("usuario_maria_id") @db.Uuid
+  solicitacaoId  String?           @map("solicitacao_id") @db.Uuid
+  tipo           TipoNotificacao
+  titulo         String?
+  corpo          String
+  canal          CanalNotificacao
+  status         StatusNotificacao @default(PENDENTE)
+  mensagemMsgId  String?           @map("mensagem_msg_id")
+  enviadoEm      DateTime?         @map("enviado_em")
+  lidaEm         DateTime?         @map("lida_em")
+  criadoEm       DateTime          @default(now()) @map("criado_em")
+
+  usuarioMaria UsuarioMaria @relation(fields: [usuarioMariaId], references: [id], onDelete: Cascade)
+  solicitacao  Solicitacao? @relation(fields: [solicitacaoId], references: [id], onDelete: SetNull)
+
+  @@index([usuarioMariaId])
+  @@index([solicitacaoId])
   @@index([status])
-  @@index([deletedAt])
-  @@map("organizations")
+  @@index([canal])
+  @@map("notificacoes")
 }
 
-model Role {
-  id          String     @id @default(uuid()) @db.Uuid
-  name        String     @unique
-  description String?
-  status      RoleStatus @default(ACTIVE)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  deletedAt   DateTime?
-
-  users       UserRole[]
-  permissions RolePermission[]
-
-  @@index([status])
-  @@index([deletedAt])
-  @@map("roles")
-}
-
-model Permission {
-  id          String   @id @default(uuid()) @db.Uuid
-  name        String   @unique
-  description String?
-  module      String
-  action      String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  roles RolePermission[]
-
-  @@index([module])
-  @@map("permissions")
-}
-
-model UserRole {
-  userId    String   @db.Uuid
-  roleId    String   @db.Uuid
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
-
-  @@id([userId, roleId])
-  @@index([userId])
-  @@index([roleId])
-  @@map("user_roles")
-}
-
-model RolePermission {
-  roleId       String   @db.Uuid
-  permissionId String   @db.Uuid
-  createdAt    DateTime @default(now())
-
-  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-
-  @@id([roleId, permissionId])
-  @@index([roleId])
-  @@index([permissionId])
-  @@map("role_permissions")
-}
+// ===================================================================
+// SEGURANÇA / AUDITORIA (CRM)
+// ===================================================================
 
 model RefreshToken {
-  id        String    @id @default(uuid()) @db.Uuid
-  userId    String    @db.Uuid
-  tokenHash String
-  sessionId String    @db.Uuid
-  expiresAt DateTime
-  revokedAt DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id           String    @id @default(uuid()) @db.Uuid
+  usuarioCrmId String    @map("usuario_crm_id") @db.Uuid
+  tokenHash    String    @map("token_hash")
+  sessionId    String    @map("session_id") @db.Uuid
+  expiraEm     DateTime  @map("expira_em")
+  revogadoEm   DateTime? @map("revogado_em")
+  criadoEm     DateTime  @default(now()) @map("criado_em")
+  atualizadoEm DateTime  @updatedAt @map("atualizado_em")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  usuarioCrm UsuarioCrm @relation(fields: [usuarioCrmId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
+  @@index([usuarioCrmId])
   @@index([sessionId])
-  @@index([revokedAt])
+  @@index([revogadoEm])
   @@map("refresh_tokens")
 }
 
 model AuditLog {
-  id         String   @id @default(uuid()) @db.Uuid
-  userId     String?  @db.Uuid
-  action     String
-  resource   String
-  resourceId String?
-  ipAddress  String?
-  userAgent  String?
-  metadata   Json?
-  createdAt  DateTime @default(now())
+  id           String   @id @default(uuid()) @db.Uuid
+  usuarioCrmId String?  @map("usuario_crm_id") @db.Uuid
+  acao         String
+  recurso      String
+  recursoId    String?  @map("recurso_id")
+  ipAddress    String?  @map("ip_address")
+  userAgent    String?  @map("user_agent")
+  metadata     Json?
+  criadoEm     DateTime @default(now()) @map("criado_em")
 
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  usuarioCrm UsuarioCrm? @relation(fields: [usuarioCrmId], references: [id], onDelete: SetNull)
 
-  @@index([userId])
-  @@index([action])
-  @@index([resource])
-  @@index([createdAt])
+  @@index([usuarioCrmId])
+  @@index([acao])
+  @@index([recurso])
+  @@index([criadoEm])
   @@map("audit_logs")
 }

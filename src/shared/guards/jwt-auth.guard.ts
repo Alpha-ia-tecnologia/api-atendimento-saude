@@ -46,7 +46,7 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     const session = await this.prisma.refreshToken.findFirst({
-      where: { sessionId: payload.sessionId, revokedAt: null },
+      where: { sessionId: payload.sessionId, revogadoEm: null },
       select: { id: true },
     });
     if (!session) {

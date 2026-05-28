@@ -1,102 +1,75 @@
-import { PrismaClient, OrganizationStatus, RoleStatus, UserStatus } from '@prisma/client';
+import { PrismaClient, TipoEspecialidade, TipoPerfilCrm } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
-const PERMISSIONS = [
-  { name: 'USER_VIEW', module: 'USER', action: 'VIEW', description: 'View users' },
-  { name: 'USER_CREATE', module: 'USER', action: 'CREATE', description: 'Create users' },
-  { name: 'USER_UPDATE', module: 'USER', action: 'UPDATE', description: 'Update users' },
-  { name: 'USER_DELETE', module: 'USER', action: 'DELETE', description: 'Delete users' },
-  { name: 'ORGANIZATION_VIEW', module: 'ORGANIZATION', action: 'VIEW', description: 'View organizations' },
-  { name: 'ORGANIZATION_CREATE', module: 'ORGANIZATION', action: 'CREATE', description: 'Create organizations' },
-  { name: 'ORGANIZATION_UPDATE', module: 'ORGANIZATION', action: 'UPDATE', description: 'Update organizations' },
-  { name: 'ORGANIZATION_DELETE', module: 'ORGANIZATION', action: 'DELETE', description: 'Delete organizations' },
-  { name: 'ROLE_VIEW', module: 'ROLE', action: 'VIEW', description: 'View roles' },
-  { name: 'ROLE_CREATE', module: 'ROLE', action: 'CREATE', description: 'Create roles' },
-  { name: 'ROLE_UPDATE', module: 'ROLE', action: 'UPDATE', description: 'Update roles' },
-  { name: 'ROLE_DELETE', module: 'ROLE', action: 'DELETE', description: 'Delete roles' },
-  { name: 'PERMISSION_VIEW', module: 'PERMISSION', action: 'VIEW', description: 'View permissions' },
-  { name: 'PERMISSION_CREATE', module: 'PERMISSION', action: 'CREATE', description: 'Create permissions' },
-  { name: 'AUDIT_VIEW', module: 'AUDIT', action: 'VIEW', description: 'View audit logs' },
+const ESPECIALIDADES = [
+  { nome: 'Ginecologia', tipo: TipoEspecialidade.CONSULTA, ordem: 1 },
+  { nome: 'Endocrinologia Adulto', tipo: TipoEspecialidade.CONSULTA, ordem: 2 },
+  { nome: 'Dermatologista Adulto', tipo: TipoEspecialidade.CONSULTA, ordem: 3 },
+  { nome: 'Dermatologista Infantil', tipo: TipoEspecialidade.CONSULTA, ordem: 4 },
+  { nome: 'Neurologista Adulto', tipo: TipoEspecialidade.CONSULTA, ordem: 5 },
+  { nome: 'Neurologista Infantil', tipo: TipoEspecialidade.CONSULTA, ordem: 6 },
+  { nome: 'Psiquiatra Adulto', tipo: TipoEspecialidade.CONSULTA, ordem: 7 },
+  { nome: 'Psiquiatra Infantil', tipo: TipoEspecialidade.CONSULTA, ordem: 8 },
+  { nome: 'Cardiologista Adulto', tipo: TipoEspecialidade.CONSULTA, ordem: 9 },
+  { nome: 'Cardiologista Infantil', tipo: TipoEspecialidade.CONSULTA, ordem: 10 },
+  { nome: 'Ortopedista Adulto', tipo: TipoEspecialidade.CONSULTA, ordem: 11 },
+  { nome: 'Ortopedista Infantil', tipo: TipoEspecialidade.CONSULTA, ordem: 12 },
+  { nome: 'Cirurgião Geral Adulto', tipo: TipoEspecialidade.CONSULTA, ordem: 13 },
+  { nome: 'Cirurgião Vascular', tipo: TipoEspecialidade.CONSULTA, ordem: 14 },
+  { nome: 'Gastroenterologista Adulto', tipo: TipoEspecialidade.CONSULTA, ordem: 15 },
+  { nome: 'Gastroenterologista Infantil', tipo: TipoEspecialidade.CONSULTA, ordem: 16 },
+  { nome: 'Oftalmologista Adulto', tipo: TipoEspecialidade.CONSULTA, ordem: 17 },
+  { nome: 'Oftalmologista Infantil', tipo: TipoEspecialidade.CONSULTA, ordem: 18 },
+  { nome: 'Otorrinolaringologista Adulto', tipo: TipoEspecialidade.CONSULTA, ordem: 19 },
+  { nome: 'Otorrinolaringologista Infantil', tipo: TipoEspecialidade.CONSULTA, ordem: 20 },
+  { nome: 'Urologista Adulto', tipo: TipoEspecialidade.CONSULTA, ordem: 21 },
+  { nome: 'Urologista Infantil', tipo: TipoEspecialidade.CONSULTA, ordem: 22 },
+  { nome: 'Pediatria', tipo: TipoEspecialidade.CONSULTA, ordem: 23 },
+  { nome: 'Eletroencefalograma', tipo: TipoEspecialidade.EXAME, ordem: 1 },
+  { nome: 'Raio X', tipo: TipoEspecialidade.EXAME, ordem: 2 },
+  { nome: 'Ultrassonografia', tipo: TipoEspecialidade.EXAME, ordem: 3 },
+  { nome: 'Endoscopia Digestiva', tipo: TipoEspecialidade.EXAME, ordem: 4 },
 ];
 
 async function main() {
-  const adminName = process.env.ADMIN_NAME ?? 'Admin';
+  const adminNome = process.env.ADMIN_NAME ?? 'Administrador';
   const adminEmail = process.env.ADMIN_EMAIL ?? 'admin@example.com';
   const adminPassword = process.env.ADMIN_PASSWORD ?? 'Admin@123';
   const saltRounds = Number(process.env.BCRYPT_SALT_ROUNDS ?? 10);
 
   console.log('Seeding database...');
 
-  const organization = await prisma.organization.upsert({
-    where: { document: '00000000000000' },
-    update: {},
-    create: {
-      name: 'Default Organization',
-      document: '00000000000000',
-      status: OrganizationStatus.ACTIVE,
-    },
-  });
-  console.log(`Organization ready: ${organization.name}`);
-
-  for (const p of PERMISSIONS) {
-    await prisma.permission.upsert({
-      where: { name: p.name },
-      update: { description: p.description, module: p.module, action: p.action },
-      create: p,
+  for (const especialidade of ESPECIALIDADES) {
+    await prisma.especialidade.upsert({
+      where: { nome: especialidade.nome },
+      update: { tipo: especialidade.tipo, ordem: especialidade.ordem, disponivel: true },
+      create: { ...especialidade, disponivel: true },
     });
   }
-  console.log(`Permissions ready: ${PERMISSIONS.length}`);
+  console.log(`Especialidades prontas: ${ESPECIALIDADES.length}`);
 
-  const adminRole = await prisma.role.upsert({
-    where: { name: 'ADMIN' },
-    update: { status: RoleStatus.ACTIVE },
-    create: {
-      name: 'ADMIN',
-      description: 'Full administrator',
-      status: RoleStatus.ACTIVE,
-    },
-  });
-  console.log(`Role ready: ${adminRole.name}`);
+  const senhaHash = await bcrypt.hash(adminPassword, saltRounds);
 
-  const allPermissions = await prisma.permission.findMany();
-  for (const perm of allPermissions) {
-    await prisma.rolePermission.upsert({
-      where: { roleId_permissionId: { roleId: adminRole.id, permissionId: perm.id } },
-      update: {},
-      create: { roleId: adminRole.id, permissionId: perm.id },
-    });
-  }
-  console.log(`Role ${adminRole.name} linked to ${allPermissions.length} permissions`);
-
-  const passwordHash = await bcrypt.hash(adminPassword, saltRounds);
-
-  const adminUser = await prisma.user.upsert({
+  const admin = await prisma.usuarioCrm.upsert({
     where: { email: adminEmail },
     update: {
-      name: adminName,
-      status: UserStatus.ACTIVE,
-      organizationId: organization.id,
+      nomeCompleto: adminNome,
+      ativo: true,
+      tipoPerfil: TipoPerfilCrm.ADMIN,
     },
     create: {
-      name: adminName,
+      nomeCompleto: adminNome,
       email: adminEmail,
-      passwordHash,
-      status: UserStatus.ACTIVE,
-      organizationId: organization.id,
+      senhaHash,
+      tipoPerfil: TipoPerfilCrm.ADMIN,
+      ativo: true,
     },
   });
-  console.log(`Admin user ready: ${adminUser.email}`);
+  console.log(`Usuário CRM admin pronto: ${admin.email}`);
 
-  await prisma.userRole.upsert({
-    where: { userId_roleId: { userId: adminUser.id, roleId: adminRole.id } },
-    update: {},
-    create: { userId: adminUser.id, roleId: adminRole.id },
-  });
-  console.log('Admin assigned to ADMIN role');
-
-  console.log('Seed complete.');
+  console.log('Seed completo.');
 }
 
 main()

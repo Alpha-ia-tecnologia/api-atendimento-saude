@@ -5,6 +5,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 
 import { validateEnv } from './shared/config/env.validation';
 import { SharedModule } from './shared/shared.module';
+import { AcessibilidadeModule } from './modules/acessibilidade/acessibilidade.module';
 import { AuthMariaModule } from './modules/auth-maria/auth-maria.module';
 import { EspecialidadesModule } from './modules/especialidades/especialidades.module';
 import { SolicitacoesModule } from './modules/solicitacoes/solicitacoes.module';
@@ -24,6 +25,7 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     EventEmitterModule.forRoot(),
     SharedModule,
     AuthMariaModule,
+    AcessibilidadeModule,
     EspecialidadesModule,
     SolicitacoesModule,
     UploadsModule,

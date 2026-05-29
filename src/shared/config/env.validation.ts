@@ -44,6 +44,28 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   CORS_ORIGIN?: string;
+
+  // ---- MinIO ----
+  @IsString()
+  @IsNotEmpty()
+  MINIO_ENDPOINT!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  MINIO_ACCESS_KEY!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  MINIO_SECRET_KEY!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  MINIO_BUCKET_NAME!: string;
+
+  /** Tipicamente 'us-east-1' pra MinIO. */
+  @IsString()
+  @IsOptional()
+  MINIO_REGION: string = 'us-east-1';
 }
 
 export function validateEnv(config: Record<string, unknown>) {

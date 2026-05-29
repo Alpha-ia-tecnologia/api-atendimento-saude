@@ -12,10 +12,8 @@ export type PrefixoUpload = 'perfis' | 'encaminhamentos' | 'comprovantes';
 
 interface UploadParams {
   prefixo: PrefixoUpload;
-  /** Subpasta lógica (usuarioId, solicitacaoId, etc). */
   proprietarioId: string;
   arquivo: Buffer;
-  /** Nome original do arquivo (usado pra detectar extensão). */
   nomeOriginal: string;
   mimeType: string;
 }
@@ -43,7 +41,7 @@ export class MinioService implements OnModuleInit {
     this.client = new S3Client({
       endpoint: this.endpoint,
       region: this.configService.get<string>('MINIO_REGION', 'us-east-1'),
-      forcePathStyle: true, // MinIO usa path-style por padrão
+      forcePathStyle: true,
       credentials: {
         accessKeyId: this.configService.getOrThrow<string>('MINIO_ACCESS_KEY'),
         secretAccessKey: this.configService.getOrThrow<string>('MINIO_SECRET_KEY'),
@@ -75,8 +73,8 @@ export class MinioService implements OnModuleInit {
   }
 
   /**
-   * Gera uma URL temporária pra download (útil pra bucket privado).
-   * Pra MVP com bucket público a urlPublica já basta.
+   * Gera URL pré-assinada GET. Funciona em bucket privado E público.
+   * Default 1h — tempo que o usuário fica vendo a tela.
    */
   async presignedGetUrl(key: string, expiraEmSegundos = 60 * 60): Promise<string> {
     return getSignedUrl(
@@ -84,6 +82,38 @@ export class MinioService implements OnModuleInit {
       new GetObjectCommand({ Bucket: this.bucket, Key: key }),
       { expiresIn: expiraEmSegundos },
     );
+  }
+
+  /**
+   * Recebe uma URL salva no banco (que pode ser nossa, do MinIO, OU externa)
+   * e devolve uma URL acessível pelo cliente.
+   * - URL do nosso MinIO → presigned URL temporária
+   * - URL externa (CDN/etc) → passa direto
+   * - null → null
+   */
+  async assinarUrlDeArquivo(
+    url: string | null | undefined,
+    expiraEmSegundos = 60 * 60,
+  ): Promise<string | null> {
+    if (!url) return null;
+    const key = this.extrairKeyDeUrl(url);
+    if (!key) return url; // URL externa — repassa
+    try {
+      return await this.presignedGetUrl(key, expiraEmSegundos);
+    } catch (err) {
+      this.logger.error(`Falha ao assinar ${key}: ${(err as Error).message}`);
+      return url; // fallback — devolve a URL crua, se o bucket for público funciona
+    }
+  }
+
+  /**
+   * Extrai a chave (path interno do bucket) de uma URL pública do nosso MinIO.
+   * Retorna null se a URL não for do nosso endpoint+bucket.
+   */
+  extrairKeyDeUrl(url: string): string | null {
+    const prefix = `${this.endpoint}/${this.bucket}/`;
+    if (!url.startsWith(prefix)) return null;
+    return decodeURI(url.slice(prefix.length));
   }
 
   private urlPublica(key: string): string {

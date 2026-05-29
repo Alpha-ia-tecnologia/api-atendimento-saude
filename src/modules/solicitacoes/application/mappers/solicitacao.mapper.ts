@@ -5,6 +5,7 @@ import {
   TipoAnexo,
 } from '@prisma/client';
 
+import { MinioService } from '../../../files/application/services/minio.service';
 import { SolicitacaoResponseDto } from '../dtos/solicitacao-response.dto';
 import { formatarDataISO } from '../utils/formatters';
 
@@ -13,16 +14,24 @@ type SolicitacaoComRelacoes = Solicitacao & {
   anexos: SolicitacaoAnexo[];
 };
 
-export function mapearSolicitacao(
+/**
+ * Mapeia Solicitacao + relações pro DTO de resposta.
+ *
+ * Async porque assina a URL do encaminhamento via MinIO presigner —
+ * isso garante que o front consegue carregar a foto mesmo se o bucket
+ * for privado. URLs externas (CDN, etc) passam direto.
+ */
+export async function mapearSolicitacao(
   s: SolicitacaoComRelacoes,
-): SolicitacaoResponseDto {
-  // Encaminhamento = primeiro anexo de imagem (ou documento, se não houver imagem).
-  // Se um dia tiver vários anexos por solicitação, mudamos pra `anexos: []`.
+  minio: MinioService,
+): Promise<SolicitacaoResponseDto> {
   const encaminhamento =
     s.anexos.find((a) => a.tipo === TipoAnexo.IMAGEM) ??
     s.anexos.find((a) => a.tipo === TipoAnexo.DOCUMENTO) ??
     s.anexos[0] ??
     null;
+
+  const encaminhamentoUrl = await minio.assinarUrlDeArquivo(encaminhamento?.url);
 
   return {
     id: s.id,
@@ -52,7 +61,7 @@ export function mapearSolicitacao(
     motivoNaoAprovacao: s.motivoNaoAprovacao,
     dataAgendada: s.dataAgendada,
     dataRealizada: s.dataRealizada,
-    encaminhamentoUrl: encaminhamento?.url ?? null,
+    encaminhamentoUrl,
     criadoEm: s.criadoEm,
     atualizadoEm: s.atualizadoEm,
   };

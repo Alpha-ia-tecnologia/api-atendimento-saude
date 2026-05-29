@@ -25,7 +25,7 @@ import {
 import type { AuthenticatedMaria } from '../../../auth-maria/application/services/token-maria.service';
 import { MariaUser } from '../../../auth-maria/presentation/decorators/maria-user.decorator';
 import { JwtMariaGuard } from '../../../auth-maria/presentation/guards/jwt-maria.guard';
-import { MinioService } from '../../application/services/minio.service';
+import { MinioService } from '../../../files/application/services/minio.service';
 
 class UploadResponseDto {
   @ApiProperty({ description: 'URL pública do arquivo no MinIO.' })

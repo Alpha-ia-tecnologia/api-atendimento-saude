@@ -1,23 +1,22 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 
+import { MinioService } from '../../../files/application/services/minio.service';
 import { PrismaService } from '../../../../shared/database/prisma/prisma.service';
+import { mapearUsuarioMaria } from '../mappers/usuario-maria.mapper';
 import {
   LoginCadastradoResponseDto,
   LoginNovoResponseDto,
 } from '../dtos/auth-maria-response.dto';
 import { LoginMariaDto } from '../dtos/login-maria.dto';
 import { TokenMariaService } from '../services/token-maria.service';
-import {
-  formatarDataNascimentoISO,
-  parseDataNascimentoBR,
-  somenteDigitos,
-} from '../utils/formatters';
+import { parseDataNascimentoBR, somenteDigitos } from '../utils/formatters';
 
 @Injectable()
 export class LoginMariaUseCase {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tokenService: TokenMariaService,
+    private readonly minio: MinioService,
   ) {}
 
   async execute(
@@ -65,16 +64,7 @@ export class LoginMariaUseCase {
     return {
       status: 'CADASTRADO',
       accessToken,
-      usuario: {
-        id: usuario.id,
-        nome: usuario.nome,
-        cpf: usuario.cpf,
-        dataNascimento: formatarDataNascimentoISO(usuario.dataNascimento),
-        numeroWhatsapp: usuario.numeroWhatsapp,
-        endereco: usuario.endereco,
-        fotoPerfilUrl: usuario.fotoPerfilUrl,
-        criadoEm: usuario.criadoEm,
-      },
+      usuario: await mapearUsuarioMaria(usuario, this.minio),
     };
   }
 }

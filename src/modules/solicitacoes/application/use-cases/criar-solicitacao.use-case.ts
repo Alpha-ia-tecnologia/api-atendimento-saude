@@ -10,6 +10,7 @@ import {
   TipoAnexo,
 } from '@prisma/client';
 
+import { MinioService } from '../../../files/application/services/minio.service';
 import { PrismaService } from '../../../../shared/database/prisma/prisma.service';
 import { CriarSolicitacaoDto } from '../dtos/criar-solicitacao.dto';
 import { SolicitacaoResponseDto } from '../dtos/solicitacao-response.dto';
@@ -22,6 +23,7 @@ export class CriarSolicitacaoUseCase {
   constructor(
     private readonly prisma: PrismaService,
     private readonly protocoloService: ProtocoloService,
+    private readonly minio: MinioService,
   ) {}
 
   async execute(
@@ -129,7 +131,7 @@ export class CriarSolicitacaoUseCase {
       include: { especialidade: true, anexos: true },
     });
 
-    return mapearSolicitacao(criada);
+    return mapearSolicitacao(criada, this.minio);
   }
 
   private adivinharTipoAnexo(url: string): TipoAnexo {

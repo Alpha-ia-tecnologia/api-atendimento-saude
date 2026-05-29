@@ -235,6 +235,12 @@ model Solicitacao {
   dataAgendada           DateTime? @map("data_agendada")
   dataRealizada          DateTime? @map("data_realizada")
 
+  // -------- Cancelamento pelo paciente --------
+  /// Quando o paciente (solicitante ou paciente cadastrado) cancelou.
+  canceladaEm         DateTime? @map("cancelada_em")
+  /// Texto livre opcional pra o paciente explicar o motivo.
+  motivoCancelamento  String?   @map("motivo_cancelamento")
+
   // -------- Auditoria --------
   criadoEm     DateTime  @default(now()) @map("criado_em")
   atualizadoEm DateTime  @updatedAt @map("atualizado_em")

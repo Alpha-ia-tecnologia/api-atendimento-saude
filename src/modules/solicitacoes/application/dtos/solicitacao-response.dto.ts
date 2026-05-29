@@ -49,6 +49,17 @@ export class SolicitacaoResponseDto {
 
   @ApiPropertyOptional({
     nullable: true,
+    description: 'Quando o paciente cancelou (null se não foi cancelada).',
+  })
+  canceladaEm!: Date | null;
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Motivo do cancelamento informado pelo paciente.',
+  })
+  motivoCancelamento!: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
     description: 'URL do encaminhamento médico no MinIO (quando enviado).',
   })
   encaminhamentoUrl!: string | null;

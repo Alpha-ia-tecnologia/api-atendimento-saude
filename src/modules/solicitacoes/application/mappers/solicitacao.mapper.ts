@@ -61,6 +61,8 @@ export async function mapearSolicitacao(
     motivoNaoAprovacao: s.motivoNaoAprovacao,
     dataAgendada: s.dataAgendada,
     dataRealizada: s.dataRealizada,
+    canceladaEm: s.canceladaEm,
+    motivoCancelamento: s.motivoCancelamento,
     encaminhamentoUrl,
     criadoEm: s.criadoEm,
     atualizadoEm: s.atualizadoEm,

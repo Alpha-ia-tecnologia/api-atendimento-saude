@@ -17,8 +17,10 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 
+import { CancelarSolicitacaoDto } from '../../application/dtos/cancelar-solicitacao.dto';
 import { CriarSolicitacaoDto } from '../../application/dtos/criar-solicitacao.dto';
 import { SolicitacaoResponseDto } from '../../application/dtos/solicitacao-response.dto';
+import { CancelarSolicitacaoUseCase } from '../../application/use-cases/cancelar-solicitacao.use-case';
 import { CriarSolicitacaoUseCase } from '../../application/use-cases/criar-solicitacao.use-case';
 import { ListarMinhasSolicitacoesUseCase } from '../../application/use-cases/listar-minhas-solicitacoes.use-case';
 import { ObterSolicitacaoUseCase } from '../../application/use-cases/obter-solicitacao.use-case';
@@ -35,6 +37,7 @@ export class SolicitacoesController {
     private readonly criar: CriarSolicitacaoUseCase,
     private readonly listar: ListarMinhasSolicitacoesUseCase,
     private readonly obter: ObterSolicitacaoUseCase,
+    private readonly cancelarUseCase: CancelarSolicitacaoUseCase,
   ) {}
 
   @Post()
@@ -78,5 +81,28 @@ export class SolicitacoesController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<SolicitacaoResponseDto> {
     return this.obter.execute(user.usuarioMariaId, id);
+  }
+
+  @Post(':id/cancelar')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Cancela uma solicitação (só status SOLICITADA).',
+    description:
+      'O paciente cancela sua solicitação ainda em análise. ' +
+      'Pode cancelar quem CRIOU (solicitante) OU quem é o paciente cadastrado ' +
+      '(mesmo CPF do paciente bate com o CPF do usuário logado). ' +
+      'Depois de AGENDADA/REALIZADA, devolve 409 — usa o CRM pra cancelar.',
+  })
+  @ApiOkResponse({ type: SolicitacaoResponseDto })
+  async cancelar(
+    @MariaUser() user: AuthenticatedMaria,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CancelarSolicitacaoDto,
+  ): Promise<SolicitacaoResponseDto> {
+    return this.cancelarUseCase.execute(
+      id,
+      { usuarioMariaId: user.usuarioMariaId, cpf: user.cpf },
+      dto.motivo,
+    );
   }
 }

@@ -3,6 +3,7 @@ import {
   OrigemSolicitacao,
   ParaQuem,
   StatusSolicitacao,
+  TipoConsulta,
   TipoEspecialidade,
 } from '@prisma/client';
 
@@ -28,6 +29,12 @@ export class SolicitacaoResponseDto {
   @ApiProperty({ example: '2026551234' }) protocolo!: string;
   @ApiProperty({ enum: StatusSolicitacao }) status!: StatusSolicitacao;
   @ApiProperty({ enum: TipoEspecialidade }) tipo!: TipoEspecialidade;
+  @ApiPropertyOptional({
+    enum: TipoConsulta,
+    nullable: true,
+    description: 'PRIMEIRA ou RETORNO; null para exames.',
+  })
+  tipoConsulta!: TipoConsulta | null;
   @ApiProperty({ enum: ParaQuem }) paraQuem!: ParaQuem;
   @ApiProperty({ enum: OrigemSolicitacao }) origem!: OrigemSolicitacao;
 

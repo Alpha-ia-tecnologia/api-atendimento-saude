@@ -8,6 +8,7 @@ import {
   Prisma,
   StatusSolicitacao,
   TipoAnexo,
+  TipoEspecialidade,
 } from '@prisma/client';
 
 import { MinioService } from '../../../files/application/services/minio.service';
@@ -48,6 +49,22 @@ export class CriarSolicitacaoUseCase {
     if (!especialidade.disponivel) {
       throw new BadRequestException(
         'Essa especialidade não está disponível no momento.',
+      );
+    }
+
+    // 2.1 Regra: consulta exige tipoConsulta (PRIMEIRA ou RETORNO).
+    //     Exame/Outro ignora — guardamos null mesmo que venha preenchido,
+    //     pra evitar dados inconsistentes.
+    const tipoConsulta =
+      especialidade.tipo === TipoEspecialidade.CONSULTA
+        ? dto.tipoConsulta ?? null
+        : null;
+    if (
+      especialidade.tipo === TipoEspecialidade.CONSULTA &&
+      !tipoConsulta
+    ) {
+      throw new BadRequestException(
+        'Pra consultas, informe se é primeira vez ou retorno.',
       );
     }
 
@@ -104,6 +121,7 @@ export class CriarSolicitacaoUseCase {
       origem: dto.origem,
       status: StatusSolicitacao.SOLICITADA,
       tipo: especialidade.tipo,
+      tipoConsulta,
       pacienteNome: pacienteSnapshot.nome,
       pacienteCpf: pacienteSnapshot.cpf,
       pacienteDataNascimento: pacienteSnapshot.dataNascimento,

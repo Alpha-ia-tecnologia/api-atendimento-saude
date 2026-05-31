@@ -38,6 +38,7 @@ export async function mapearSolicitacao(
     protocolo: s.protocolo,
     status: s.status,
     tipo: s.tipo,
+    tipoConsulta: s.tipoConsulta,
     paraQuem: s.paraQuem,
     origem: s.origem,
 

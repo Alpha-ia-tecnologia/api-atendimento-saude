@@ -9,7 +9,7 @@ import {
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
-import { OrigemSolicitacao, ParaQuem } from '@prisma/client';
+import { OrigemSolicitacao, ParaQuem, TipoConsulta } from '@prisma/client';
 
 import { PacienteOutraDto } from './paciente-outra.dto';
 
@@ -27,6 +27,15 @@ export class CriarSolicitacaoDto {
   })
   @IsEnum(ParaQuem)
   paraQuem!: ParaQuem;
+
+  @ApiPropertyOptional({
+    enum: TipoConsulta,
+    description:
+      'PRIMEIRA ou RETORNO. Obrigatório quando a especialidade for do tipo CONSULTA; ignorado pra EXAME/OUTRO.',
+  })
+  @IsOptional()
+  @IsEnum(TipoConsulta)
+  tipoConsulta?: TipoConsulta;
 
   @ApiProperty({
     enum: OrigemSolicitacao,

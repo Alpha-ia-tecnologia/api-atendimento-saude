@@ -28,6 +28,14 @@ enum TipoEspecialidade {
   OUTRO
 }
 
+/// Pra solicitações de CONSULTA: indica se é a primeira vez do paciente
+/// nessa especialidade ou se é um retorno (revisão / acompanhamento).
+/// Fica nullable em Solicitacao porque exames não usam.
+enum TipoConsulta {
+  PRIMEIRA
+  RETORNO
+}
+
 enum StatusSolicitacao {
   SOLICITADA
   AGENDADA
@@ -224,6 +232,9 @@ model Solicitacao {
   unidadeSaudeId  String?           @map("unidade_saude_id") @db.Uuid
   especialidadeId String            @map("especialidade_id") @db.Uuid
   tipo            TipoEspecialidade
+  /// Só preenchido quando tipo=CONSULTA (PRIMEIRA ou RETORNO). Para EXAME
+  /// e OUTRO permanece null.
+  tipoConsulta    TipoConsulta?     @map("tipo_consulta")
   status          StatusSolicitacao @default(SOLICITADA)
   /// Por qual canal a solicitação chegou.
   origem          OrigemSolicitacao @default(APP)

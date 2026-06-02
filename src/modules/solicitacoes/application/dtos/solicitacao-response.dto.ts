@@ -24,6 +24,11 @@ export class EspecialidadeMinDto {
   @ApiPropertyOptional({ nullable: true }) icone!: string | null;
 }
 
+export class AgenteResponsavelDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() nomeCompleto!: string;
+}
+
 export class SolicitacaoResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty({ example: '2026551234' }) protocolo!: string;
@@ -70,6 +75,19 @@ export class SolicitacaoResponseDto {
     description: 'URL do encaminhamento médico no MinIO (quando enviado).',
   })
   encaminhamentoUrl!: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'URL do PDF do agendamento (SISREG) anexado ao aprovar.',
+  })
+  agendamentoPdfUrl!: string | null;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    type: AgenteResponsavelDto,
+    description: 'Operador que assumiu/decidiu (quando houver).',
+  })
+  agenteResponsavel!: AgenteResponsavelDto | null;
 
   @ApiProperty() criadoEm!: Date;
   @ApiProperty() atualizadoEm!: Date;

@@ -3,6 +3,7 @@ import {
   Solicitacao,
   SolicitacaoAnexo,
   TipoAnexo,
+  UsuarioCrm,
 } from '@prisma/client';
 
 import { MinioService } from '../../../files/application/services/minio.service';
@@ -12,6 +13,8 @@ import { formatarDataISO } from '../utils/formatters';
 type SolicitacaoComRelacoes = Solicitacao & {
   especialidade: Especialidade;
   anexos: SolicitacaoAnexo[];
+  /** Opcional: presente nas consultas do gestor. */
+  agenteResponsavel?: UsuarioCrm | null;
 };
 
 /**
@@ -32,6 +35,7 @@ export async function mapearSolicitacao(
     null;
 
   const encaminhamentoUrl = await minio.assinarUrlDeArquivo(encaminhamento?.url);
+  const agendamentoPdfUrl = await minio.assinarUrlDeArquivo(s.agendamentoPdfUrl);
 
   return {
     id: s.id,
@@ -65,6 +69,10 @@ export async function mapearSolicitacao(
     canceladaEm: s.canceladaEm,
     motivoCancelamento: s.motivoCancelamento,
     encaminhamentoUrl,
+    agendamentoPdfUrl,
+    agenteResponsavel: s.agenteResponsavel
+      ? { id: s.agenteResponsavel.id, nomeCompleto: s.agenteResponsavel.nomeCompleto }
+      : null,
     criadoEm: s.criadoEm,
     atualizadoEm: s.atualizadoEm,
   };

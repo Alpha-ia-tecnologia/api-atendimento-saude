@@ -16,11 +16,16 @@ async function bootstrap() {
 
   app.use(helmet());
 
-  const corsOrigin = configService.get<string>('CORS_ORIGIN');
-  app.enableCors({
-    origin: corsOrigin ? corsOrigin.split(',').map((o) => o.trim()) : true,
-    credentials: true,
-  });
+  // `CORS_ORIGIN=*` (ou vazio) → reflete qualquer origem (origin: true). Uma
+  // lista separada por vírgula → só essas origens. Importante: o array `['*']`
+  // NÃO funciona como curinga no pacote `cors` (faz match exato), por isso o
+  // caso `*` precisa virar `true`.
+  const corsOrigin = configService.get<string>('CORS_ORIGIN')?.trim();
+  const origin =
+    !corsOrigin || corsOrigin === '*'
+      ? true
+      : corsOrigin.split(',').map((o) => o.trim());
+  app.enableCors({ origin, credentials: true });
 
   app.useGlobalPipes(
     new ValidationPipe({

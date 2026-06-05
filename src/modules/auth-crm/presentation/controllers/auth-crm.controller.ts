@@ -1,24 +1,12 @@
-import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Post,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOkResponse,
-  ApiOperation,
-  ApiTags,
-} from '@nestjs/swagger';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 
 import { AuthCrmResponseDto, UsuarioCrmDto } from '../../application/dtos/auth-crm-response.dto';
 import { LoginCrmDto } from '../../application/dtos/login-crm.dto';
 import { RefreshCrmDto } from '../../application/dtos/refresh-crm.dto';
 import type { AuthenticatedCrm } from '../../application/services/token-crm.service';
+import { ListarOperadoresCrmUseCase } from '../../application/use-cases/listar-operadores-crm.use-case';
 import { LoginCrmUseCase } from '../../application/use-cases/login-crm.use-case';
 import { LogoutCrmUseCase } from '../../application/use-cases/logout-crm.use-case';
 import { ObterPerfilCrmUseCase } from '../../application/use-cases/obter-perfil-crm.use-case';
@@ -34,6 +22,7 @@ export class AuthCrmController {
     private readonly refreshUseCase: RefreshCrmUseCase,
     private readonly logoutUseCase: LogoutCrmUseCase,
     private readonly obterPerfilUseCase: ObterPerfilCrmUseCase,
+    private readonly listarOperadoresUseCase: ListarOperadoresCrmUseCase,
   ) {}
 
   @Post('login')
@@ -72,5 +61,15 @@ export class AuthCrmController {
   @ApiOkResponse({ type: UsuarioCrmDto })
   async me(@CrmUser() user: AuthenticatedCrm): Promise<UsuarioCrmDto> {
     return this.obterPerfilUseCase.execute(user.usuarioCrmId);
+  }
+
+  @Get('operadores')
+  @UseGuards(JwtCrmGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Lista operadores ativos do CRM (id + nome), para filtros.',
+  })
+  async listarOperadores() {
+    return this.listarOperadoresUseCase.execute();
   }
 }

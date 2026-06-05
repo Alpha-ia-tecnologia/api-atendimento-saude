@@ -1,7 +1,10 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { StatusSolicitacao } from '@prisma/client';
 
+import { AUDIT_EVENT } from '../../../audit/application/events/audit.event';
 import { MinioService } from '../../../files/application/services/minio.service';
+import { NotificarSolicitacaoService } from '../../../notificacoes/application/services/notificar-solicitacao.service';
 import { PrismaService } from '../../../../shared/database/prisma/prisma.service';
 import { SolicitacaoResponseDto } from '../dtos/solicitacao-response.dto';
 import { mapearSolicitacao } from '../mappers/solicitacao.mapper';
@@ -18,6 +21,8 @@ export class AprovarSolicitacaoUseCase {
   constructor(
     private readonly prisma: PrismaService,
     private readonly minio: MinioService,
+    private readonly notificar: NotificarSolicitacaoService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /** EM_ATENDIMENTO → AGENDADA, anexando o PDF do agendamento. */
@@ -47,6 +52,17 @@ export class AprovarSolicitacaoUseCase {
         agenteResponsavelCrmId: operadorId,
       },
       include: { especialidade: true, anexos: true, agenteResponsavel: true },
+    });
+
+    // H6.3 — avisa o solicitante (inbox in-app + WhatsApp). Nunca lança.
+    await this.notificar.solicitacaoAgendada(atualizada);
+
+    this.eventEmitter.emit(AUDIT_EVENT, {
+      userId: operadorId,
+      action: 'SOLICITACAO_APROVADA',
+      resource: 'solicitacao',
+      resourceId: id,
+      metadata: { protocolo: atualizada.protocolo, dataAgendada: params.dataAgendada },
     });
 
     return mapearSolicitacao(atualizada, this.minio);

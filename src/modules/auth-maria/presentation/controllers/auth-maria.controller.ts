@@ -8,12 +8,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOkResponse,
-  ApiOperation,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 
 import { MinioService } from '../../../files/application/services/minio.service';
@@ -114,9 +109,6 @@ export class AuthMariaController {
     @MariaUser() user: AuthenticatedMaria,
     @Body() dto: AtualizarFotoPerfilDto,
   ): Promise<UsuarioMariaDto> {
-    return this.atualizarFotoUseCase.execute(
-      user.usuarioMariaId,
-      dto.fotoPerfilUrl ?? null,
-    );
+    return this.atualizarFotoUseCase.execute(user.usuarioMariaId, dto.fotoPerfilUrl ?? null);
   }
 }

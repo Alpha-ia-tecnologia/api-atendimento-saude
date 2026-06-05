@@ -27,9 +27,7 @@ export class RegistroMariaUseCase {
       select: { id: true },
     });
     if (jaExiste) {
-      throw new ConflictException(
-        'Este CPF já está cadastrado. Volte à tela de login.',
-      );
+      throw new ConflictException('Este CPF já está cadastrado. Volte à tela de login.');
     }
 
     const usuario = await this.prisma.usuarioMaria.create({

@@ -1,15 +1,18 @@
 import { Controller, Get, Param, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../../../shared/guards/jwt-auth.guard';
-import { PermissionsGuard } from '../../../../shared/guards/permissions.guard';
-import { Permissions } from '../../../../shared/decorators/permissions.decorator';
+
+import { PerfilCrm } from '../../../auth-crm/presentation/decorators/perfil-crm.decorator';
+import { JwtCrmGuard } from '../../../auth-crm/presentation/guards/jwt-crm.guard';
+import { PerfilGuard } from '../../../auth-crm/presentation/guards/perfil.guard';
 import { AuditLogQueryDto } from '../../application/dtos/audit-log-query.dto';
 import { ListAuditLogsUseCase } from '../../application/use-cases/list-audit-logs.use-case';
 import { GetAuditLogUseCase } from '../../application/use-cases/get-audit-log.use-case';
 
-@ApiTags('Audit')
+/** Trilha de auditoria do CRM (RF42) — leitura restrita a ADMIN. */
+@ApiTags('Auditoria')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtCrmGuard, PerfilGuard)
+@PerfilCrm('ADMIN')
 @Controller('audit')
 export class AuditController {
   constructor(
@@ -18,18 +21,14 @@ export class AuditController {
   ) {}
 
   @Get()
-  @Permissions('AUDIT_VIEW')
-  @ApiOperation({ summary: 'Listar logs de auditoria' })
+  @ApiOperation({ summary: 'Lista logs de auditoria (filtros: ação, recurso, período, busca).' })
   async list(@Query() query: AuditLogQueryDto) {
-    const data = await this.listAuditLogsUseCase.execute(query);
-    return { message: 'Logs de auditoria listados', data };
+    return this.listAuditLogsUseCase.execute(query);
   }
 
   @Get(':id')
-  @Permissions('AUDIT_VIEW')
-  @ApiOperation({ summary: 'Buscar log de auditoria por ID' })
+  @ApiOperation({ summary: 'Detalhe de um log de auditoria.' })
   async findOne(@Param('id', ParseUUIDPipe) id: string) {
-    const data = await this.getAuditLogUseCase.execute(id);
-    return { message: 'Log de auditoria encontrado', data };
+    return this.getAuditLogUseCase.execute(id);
   }
 }

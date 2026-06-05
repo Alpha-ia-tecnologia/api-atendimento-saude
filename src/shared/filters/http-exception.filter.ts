@@ -17,6 +17,8 @@ interface ErrorBody {
   success: false;
   message: string;
   errors?: FieldError[];
+  /** Lista de problemas de domínio (ex.: validação de fluxo). */
+  problemas?: string[];
   timestamp: string;
   path: string;
 }
@@ -33,6 +35,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Internal server error';
     let errors: FieldError[] | undefined;
+    let problemas: string[] | undefined;
 
     if (exception instanceof HttpException) {
       status = exception.getStatus();
@@ -51,6 +54,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
         if (typeof r.error === 'string' && !errors && message === 'Internal server error') {
           message = r.error;
         }
+        if (Array.isArray(r.problemas)) {
+          problemas = r.problemas.filter((p): p is string => typeof p === 'string');
+        }
       }
     } else if (exception instanceof Error) {
       this.logger.error(exception.message, exception.stack);
@@ -67,6 +73,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       success: false,
       message,
       ...(errors ? { errors } : {}),
+      ...(problemas ? { problemas } : {}),
       timestamp: new Date().toISOString(),
       path: request.url,
     };

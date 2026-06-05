@@ -50,14 +50,33 @@ export interface NoEscolha extends NoBase {
   variavel?: string;
   /** opcaoId -> valor salvo na `variavel` (default: o próprio opcaoId). */
   valores?: Record<string, string>;
-  /** opcaoId -> id do próximo nó. */
+  /** opcaoId -> id do próximo nó (ramificação direta, estilo legado). */
   ramos: Record<string, string>;
+  /** Saída única "sempre" (ex.: vai para um nó de Condição que ramifica). */
+  proximo?: string;
 }
 
-/** Apresenta opções DINÂMICAS de especialidade (filtradas por tipoFluxo). */
+/**
+ * Nó de Condição (switch): roteia conforme o ÚLTIMO botão escolhido. Não pede
+ * entrada — avança sozinho pelo ramo correspondente. Vem logo após um ESCOLHA.
+ */
+export interface NoCondicao extends NoBase {
+  tipo: 'CONDICAO';
+  /** opcaoId -> id do próximo nó. */
+  ramos: Record<string, string>;
+  /** Ramo padrão quando nenhum bate (opcional). */
+  proximoPadrao?: string;
+}
+
+/** Apresenta opções DINÂMICAS de especialidade. */
 export interface NoEspecialidades extends NoBase {
   tipo: 'ESPECIALIDADES';
   textos?: Texto[];
+  /**
+   * Filtra o catálogo por este tipo. Quando ausente, cai no comportamento
+   * antigo: usa a variável `tipoFluxo` ('consulta'/'exame') definida no menu.
+   */
+  especialidadeTipo?: 'CONSULTA' | 'EXAME';
   proximo: string;
 }
 
@@ -96,6 +115,7 @@ export interface NoFim extends NoBase {
 export type No =
   | NoMensagem
   | NoEscolha
+  | NoCondicao
   | NoEspecialidades
   | NoPerguntaTexto
   | NoUpload

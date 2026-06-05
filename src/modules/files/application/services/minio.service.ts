@@ -1,14 +1,10 @@
-import {
-  PutObjectCommand,
-  S3Client,
-  GetObjectCommand,
-} from '@aws-sdk/client-s3';
+import { PutObjectCommand, S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 
-export type PrefixoUpload = 'perfis' | 'encaminhamentos' | 'comprovantes';
+export type PrefixoUpload = 'perfis' | 'encaminhamentos' | 'comprovantes' | 'whatsapp';
 
 interface UploadParams {
   prefixo: PrefixoUpload;
@@ -33,9 +29,7 @@ export class MinioService implements OnModuleInit {
   constructor(private readonly configService: ConfigService) {}
 
   onModuleInit(): void {
-    this.endpoint = this.configService
-      .getOrThrow<string>('MINIO_ENDPOINT')
-      .replace(/\/$/, '');
+    this.endpoint = this.configService.getOrThrow<string>('MINIO_ENDPOINT').replace(/\/$/, '');
     this.bucket = this.configService.getOrThrow<string>('MINIO_BUCKET_NAME');
 
     this.client = new S3Client({
@@ -73,15 +67,25 @@ export class MinioService implements OnModuleInit {
   }
 
   /**
+   * Baixa o objeto inteiro como Buffer. Usado pra análise local (OCR) —
+   * a foto já subiu pelo /uploads, aqui recuperamos os bytes pelo `key`.
+   */
+  async baixarBytes(key: string): Promise<Buffer> {
+    const resposta = await this.client.send(
+      new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+    );
+    const bytes = await resposta.Body!.transformToByteArray();
+    return Buffer.from(bytes);
+  }
+
+  /**
    * Gera URL pré-assinada GET. Funciona em bucket privado E público.
    * Default 1h — tempo que o usuário fica vendo a tela.
    */
   async presignedGetUrl(key: string, expiraEmSegundos = 60 * 60): Promise<string> {
-    return getSignedUrl(
-      this.client,
-      new GetObjectCommand({ Bucket: this.bucket, Key: key }),
-      { expiresIn: expiraEmSegundos },
-    );
+    return getSignedUrl(this.client, new GetObjectCommand({ Bucket: this.bucket, Key: key }), {
+      expiresIn: expiraEmSegundos,
+    });
   }
 
   /**

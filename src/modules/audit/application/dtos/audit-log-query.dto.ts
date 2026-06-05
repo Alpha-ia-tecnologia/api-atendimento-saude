@@ -4,20 +4,20 @@ import { IsDate, IsOptional, IsString, IsUUID } from 'class-validator';
 import { PaginationQueryDto } from '../../../../shared/dtos/pagination-query.dto';
 
 export class AuditLogQueryDto extends PaginationQueryDto {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ description: 'Filtra pelo operador do CRM.' })
   @IsOptional()
   @IsUUID()
-  userId?: string;
+  usuarioCrmId?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ description: 'Ação exata (ex.: SOLICITACAO_APROVADA).' })
   @IsOptional()
   @IsString()
-  action?: string;
+  acao?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ description: 'Recurso exato (ex.: solicitacao).' })
   @IsOptional()
   @IsString()
-  resource?: string;
+  recurso?: string;
 
   @ApiPropertyOptional({ type: String, format: 'date-time' })
   @IsOptional()

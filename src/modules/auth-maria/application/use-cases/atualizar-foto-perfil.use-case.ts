@@ -18,10 +18,7 @@ export class AtualizarFotoPerfilUseCase {
     private readonly minio: MinioService,
   ) {}
 
-  async execute(
-    usuarioMariaId: string,
-    fotoPerfilUrl: string | null,
-  ): Promise<UsuarioMariaDto> {
+  async execute(usuarioMariaId: string, fotoPerfilUrl: string | null): Promise<UsuarioMariaDto> {
     const existe = await this.prisma.usuarioMaria.findUnique({
       where: { id: usuarioMariaId },
       select: { id: true },

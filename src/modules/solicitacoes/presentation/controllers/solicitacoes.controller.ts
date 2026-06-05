@@ -64,9 +64,7 @@ export class SolicitacoesController {
     summary: 'Lista as solicitações que EU criei (em qualquer status).',
   })
   @ApiOkResponse({ type: [SolicitacaoResponseDto] })
-  async list(
-    @MariaUser() user: AuthenticatedMaria,
-  ): Promise<SolicitacaoResponseDto[]> {
+  async list(@MariaUser() user: AuthenticatedMaria): Promise<SolicitacaoResponseDto[]> {
     return this.listar.execute(user.usuarioMariaId);
   }
 

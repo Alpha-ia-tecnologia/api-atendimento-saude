@@ -3,6 +3,7 @@ import { AutorMensagem, EstadoConversa } from '@prisma/client';
 
 import { PrismaService } from '../../../../shared/database/prisma/prisma.service';
 import { FlowEngineService } from '../services/flow-engine.service';
+import { FluxoResolverService } from '../services/fluxo-resolver.service';
 import { montarPasso } from '../mappers/passo.mapper';
 import { PassoConversaResponseDto } from '../dtos/passo-conversa-response.dto';
 
@@ -11,13 +12,11 @@ export class ObterConversaUseCase {
   constructor(
     private readonly prisma: PrismaService,
     private readonly engine: FlowEngineService,
+    private readonly resolver: FluxoResolverService,
   ) {}
 
   /** Retoma uma conversa: devolve a próxima ação esperada no nó atual. */
-  async execute(
-    usuarioMariaId: string,
-    conversaId: string,
-  ): Promise<PassoConversaResponseDto> {
+  async execute(usuarioMariaId: string, conversaId: string): Promise<PassoConversaResponseDto> {
     const conversa = await this.prisma.conversa.findFirst({
       where: { id: conversaId, usuarioMariaId },
       include: { mensagens: { orderBy: { criadoEm: 'asc' } } },
@@ -27,11 +26,15 @@ export class ObterConversaUseCase {
     }
 
     const finalizada = conversa.estado === EstadoConversa.ENCERRADA;
+    const fluxo = finalizada
+      ? null
+      : await this.resolver.resolverParaConversa(conversa.fluxoVersaoId);
     const proximaAcao = finalizada
       ? ({ tipo: 'nenhum' } as const)
       : await this.engine.acaoAtual(
           conversa.noAtual,
           (conversa.variaveis ?? {}) as Record<string, unknown>,
+          fluxo!,
         );
 
     // Histórico para o front reconstruir o chat ao retomar.

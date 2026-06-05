@@ -23,9 +23,7 @@ export class LoginCrmUseCase {
     });
 
     // Erro genérico: não revela se o e-mail existe (anti-enumeração).
-    const credenciaisInvalidas = new UnauthorizedException(
-      'E-mail ou senha incorretos.',
-    );
+    const credenciaisInvalidas = new UnauthorizedException('E-mail ou senha incorretos.');
 
     if (!usuario || usuario.excluidoEm) throw credenciaisInvalidas;
 
@@ -37,8 +35,7 @@ export class LoginCrmUseCase {
     }
 
     // Sessão única: revoga refresh tokens ativos anteriores.
-    const sessaoUnica =
-      this.config.get<string>('AUTH_SINGLE_SESSION', 'true') === 'true';
+    const sessaoUnica = this.config.get<string>('AUTH_SINGLE_SESSION', 'true') === 'true';
     if (sessaoUnica) {
       await this.prisma.refreshToken.updateMany({
         where: { usuarioCrmId: usuario.id, revogadoEm: null },

@@ -1,18 +1,21 @@
-import { AuditLog as PrismaAuditLog } from '@prisma/client';
+import { AuditLogComOperador } from '../../domain/repositories/audit-log.repository';
 import { AuditLogResponseDto } from '../../application/dtos/audit-log-response.dto';
 
 export class AuditLogMapper {
-  static toResponse(record: PrismaAuditLog): AuditLogResponseDto {
+  static toResponse(record: AuditLogComOperador): AuditLogResponseDto {
     return {
       id: record.id,
-      userId: record.userId,
-      action: record.action,
-      resource: record.resource,
-      resourceId: record.resourceId,
+      usuarioCrmId: record.usuarioCrmId,
+      operador: record.usuarioCrm
+        ? { nomeCompleto: record.usuarioCrm.nomeCompleto, email: record.usuarioCrm.email }
+        : null,
+      acao: record.acao,
+      recurso: record.recurso,
+      recursoId: record.recursoId,
       ipAddress: record.ipAddress,
       userAgent: record.userAgent,
       metadata: record.metadata,
-      createdAt: record.createdAt,
+      criadoEm: record.criadoEm,
     };
   }
 }

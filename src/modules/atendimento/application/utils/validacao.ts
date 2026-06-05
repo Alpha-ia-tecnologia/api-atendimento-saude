@@ -1,8 +1,6 @@
 import { CampoTexto } from '../flows/tipos';
 
-export type ResultadoValidacao =
-  | { ok: true; valor: string }
-  | { ok: false; erro: string };
+export type ResultadoValidacao = { ok: true; valor: string } | { ok: false; erro: string };
 
 const digitos = (v: string): string => v.replace(/\D/g, '');
 
@@ -24,14 +22,20 @@ export function validarCampo(campo: CampoTexto, bruto: string): ResultadoValidac
     case 'cpf': {
       const d = digitos(valor);
       if (d.length !== 11) {
-        return { ok: false, erro: 'Hmm, esse CPF não parece certo. Me manda os **11 números**, por favor.' };
+        return {
+          ok: false,
+          erro: 'Hmm, esse CPF não parece certo. Me manda os **11 números**, por favor.',
+        };
       }
       return { ok: true, valor: d };
     }
 
     case 'endereco':
       if (valor.length < 10) {
-        return { ok: false, erro: 'Preciso do endereço completo: **rua, número, bairro e cidade**.' };
+        return {
+          ok: false,
+          erro: 'Preciso do endereço completo: **rua, número, bairro e cidade**.',
+        };
       }
       return { ok: true, valor };
 

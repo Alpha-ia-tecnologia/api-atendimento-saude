@@ -21,7 +21,9 @@ export class ResponseInterceptor<T> implements NestInterceptor<T, StandardRespon
           return payload as unknown as StandardResponse<T>;
         }
         const message =
-          payload && typeof payload === 'object' && 'message' in (payload as Record<string, unknown>)
+          payload &&
+          typeof payload === 'object' &&
+          'message' in (payload as Record<string, unknown>)
             ? ((payload as Record<string, unknown>).message as string)
             : 'Operação realizada com sucesso';
         const data =

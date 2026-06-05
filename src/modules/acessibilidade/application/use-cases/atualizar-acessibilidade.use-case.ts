@@ -3,10 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../shared/database/prisma/prisma.service';
 import { AcessibilidadeResponseDto } from '../dtos/acessibilidade-response.dto';
 import { AtualizarAcessibilidadeDto } from '../dtos/atualizar-acessibilidade.dto';
-import {
-  indexParaMultiplicador,
-  multiplicadorParaIndex,
-} from '../utils/escala-fonte';
+import { indexParaMultiplicador, multiplicadorParaIndex } from '../utils/escala-fonte';
 
 /**
  * PATCH parcial — só atualiza o que veio no body. Faz upsert pra criar
@@ -21,9 +18,7 @@ export class AtualizarAcessibilidadeUseCase {
     dto: AtualizarAcessibilidadeDto,
   ): Promise<AcessibilidadeResponseDto> {
     const escalaMult =
-      dto.escalaFonte !== undefined
-        ? indexParaMultiplicador(dto.escalaFonte)
-        : undefined;
+      dto.escalaFonte !== undefined ? indexParaMultiplicador(dto.escalaFonte) : undefined;
 
     const atualizado = await this.prisma.preferenciasAcessibilidade.upsert({
       where: { usuarioMariaId },

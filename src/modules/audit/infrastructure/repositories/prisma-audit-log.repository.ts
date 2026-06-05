@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { AuditLog as PrismaAuditLog, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+
 import { PrismaService } from '../../../../shared/database/prisma/prisma.service';
 import {
+  AuditLogComOperador,
   AuditLogFilters,
   AuditLogRepository,
   CreateAuditLogData,
@@ -9,17 +11,21 @@ import {
 import { PaginatedResult } from '../../../../shared/types/pagination';
 import { paginate } from '../../../../shared/utils/pagination.util';
 
+const INCLUDE_OPERADOR = {
+  usuarioCrm: { select: { nomeCompleto: true, email: true } },
+} as const;
+
 @Injectable()
 export class PrismaAuditLogRepository implements AuditLogRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(data: CreateAuditLogData): Promise<PrismaAuditLog> {
-    return this.prisma.auditLog.create({
+  async create(data: CreateAuditLogData): Promise<void> {
+    await this.prisma.auditLog.create({
       data: {
-        userId: data.userId ?? null,
-        action: data.action,
-        resource: data.resource,
-        resourceId: data.resourceId ?? null,
+        usuarioCrmId: data.userId ?? null,
+        acao: data.action,
+        recurso: data.resource,
+        recursoId: data.resourceId ?? null,
         ipAddress: data.ipAddress ?? null,
         userAgent: data.userAgent ?? null,
         metadata: (data.metadata as Prisma.InputJsonValue | undefined) ?? Prisma.JsonNull,
@@ -27,18 +33,18 @@ export class PrismaAuditLogRepository implements AuditLogRepository {
     });
   }
 
-  async findById(id: string): Promise<PrismaAuditLog | null> {
-    return this.prisma.auditLog.findUnique({ where: { id } });
+  async findById(id: string): Promise<AuditLogComOperador | null> {
+    return this.prisma.auditLog.findUnique({ where: { id }, include: INCLUDE_OPERADOR });
   }
 
-  async findMany(filters: AuditLogFilters): Promise<PaginatedResult<PrismaAuditLog>> {
+  async findMany(filters: AuditLogFilters): Promise<PaginatedResult<AuditLogComOperador>> {
     const where: Prisma.AuditLogWhereInput = {
-      ...(filters.userId ? { userId: filters.userId } : {}),
-      ...(filters.action ? { action: filters.action } : {}),
-      ...(filters.resource ? { resource: filters.resource } : {}),
+      ...(filters.usuarioCrmId ? { usuarioCrmId: filters.usuarioCrmId } : {}),
+      ...(filters.acao ? { acao: filters.acao } : {}),
+      ...(filters.recurso ? { recurso: filters.recurso } : {}),
       ...(filters.from || filters.to
         ? {
-            createdAt: {
+            criadoEm: {
               ...(filters.from ? { gte: filters.from } : {}),
               ...(filters.to ? { lte: filters.to } : {}),
             },
@@ -47,8 +53,9 @@ export class PrismaAuditLogRepository implements AuditLogRepository {
       ...(filters.search
         ? {
             OR: [
-              { action: { contains: filters.search, mode: 'insensitive' } },
-              { resource: { contains: filters.search, mode: 'insensitive' } },
+              { acao: { contains: filters.search, mode: 'insensitive' } },
+              { recurso: { contains: filters.search, mode: 'insensitive' } },
+              { recursoId: { contains: filters.search, mode: 'insensitive' } },
             ],
           }
         : {}),
@@ -59,7 +66,8 @@ export class PrismaAuditLogRepository implements AuditLogRepository {
         where,
         skip: filters.skip,
         take: filters.limit,
-        orderBy: { createdAt: filters.sortOrder ?? 'desc' },
+        orderBy: { criadoEm: filters.sortOrder ?? 'desc' },
+        include: INCLUDE_OPERADOR,
       }),
       this.prisma.auditLog.count({ where }),
     ]);

@@ -133,6 +133,64 @@ enum TipoMensagem {
 }
 
 // ===================================================================
+// FLUXO DE ATENDIMENTO (versionado — editor de fluxo do CRM)
+// ===================================================================
+
+/// Tipo lógico de um fluxo de atendimento.
+enum TipoFluxo {
+  CONSULTA
+  EXAME
+  OUTRO
+}
+
+/// Tipo de nó (passo) do fluxo. Espelha os tipos interpretados pelo motor.
+enum TipoNoFluxo {
+  INICIO
+  MENSAGEM
+  ESCOLHA
+  CONDICAO
+  ESPECIALIDADES
+  PERGUNTA_TEXTO
+  UPLOAD
+  ACAO_CRIAR_SOLICITACAO
+  FIM
+}
+
+/// Estado de uma versão de fluxo (regra de ouro: publicar é imutável).
+enum StatusFluxoVersao {
+  RASCUNHO
+  PUBLICADA
+  ARQUIVADA
+}
+
+/// Tipo de uma variável declarada pelo fluxo.
+enum TipoVariavelFluxo {
+  TEXTO
+  CPF
+  DATA
+  ARQUIVO
+  OPCAO
+  TELEFONE
+}
+
+// ===================================================================
+// INTEGRAÇÕES (canais de WhatsApp)
+// ===================================================================
+
+/// Provedor de mensageria do WhatsApp.
+enum ProvedorCanal {
+  EVOLUTION
+  META
+}
+
+/// Estado da conexão do canal com o provedor.
+enum StatusIntegracao {
+  DESCONECTADA
+  CONECTADA
+  ERRO
+}
+
+// ===================================================================
 // USUÁRIOS
 // ===================================================================
 
@@ -176,6 +234,7 @@ model UsuarioMaria {
   anexosEnviados              SolicitacaoAnexo[]
   notificacoes                Notificacao[]
   conversas                   Conversa[]
+  deviceTokens                DeviceToken[]
 
   @@index([tipoPerfil])
   @@index([ativo])
@@ -289,6 +348,9 @@ model Solicitacao {
   dataSolicitada         DateTime? @map("data_solicitada")
   dataAgendada           DateTime? @map("data_agendada")
   dataRealizada          DateTime? @map("data_realizada")
+  /// true quando o OCR de triagem reprovou a foto do encaminhamento além do
+  /// limite de tentativas — sinaliza ao operador revisar a imagem manualmente.
+  revisarAnexo           Boolean   @default(false) @map("revisar_anexo")
 
   // -------- Cancelamento pelo paciente --------
   /// Quando o paciente (solicitante ou paciente cadastrado) cancelou.
@@ -317,6 +379,8 @@ model Solicitacao {
   @@index([status])
   @@index([origem])
   @@index([paraQuem])
+  // Fila do Kanban: filtra por status + ordena por criadoEm (FIFO) com paginação.
+  @@index([status, criadoEm])
   @@map("solicitacoes")
 }
 
@@ -327,11 +391,12 @@ model SolicitacaoAnexo {
   tipo          TipoAnexo
   mimeType      String?   @map("mime_type")
   tamanhoBytes  Int?      @map("tamanho_bytes")
-  enviadoPorId  String    @map("enviado_por_id") @db.Uuid
+  /// Nullable: anexo de solicitação anônima (WhatsApp) não tem usuário.
+  enviadoPorId  String?   @map("enviado_por_id") @db.Uuid
   enviadoEm     DateTime  @default(now()) @map("enviado_em")
 
-  solicitacao Solicitacao  @relation(fields: [solicitacaoId], references: [id], onDelete: Cascade)
-  enviadoPor  UsuarioMaria @relation(fields: [enviadoPorId], references: [id])
+  solicitacao Solicitacao   @relation(fields: [solicitacaoId], references: [id], onDelete: Cascade)
+  enviadoPor  UsuarioMaria? @relation(fields: [enviadoPorId], references: [id], onDelete: SetNull)
 
   @@index([solicitacaoId])
   @@index([enviadoPorId])
@@ -344,7 +409,9 @@ model SolicitacaoAnexo {
 
 model Notificacao {
   id             String            @id @default(uuid()) @db.Uuid
-  usuarioMariaId String            @map("usuario_maria_id") @db.Uuid
+  /// Nullable: notificação de solicitação anônima (WhatsApp sem cadastro)
+  /// registra só o envio pelo canal — não há inbox in-app pra exibir.
+  usuarioMariaId String?           @map("usuario_maria_id") @db.Uuid
   solicitacaoId  String?           @map("solicitacao_id") @db.Uuid
   tipo           TipoNotificacao
   titulo         String?
@@ -356,14 +423,34 @@ model Notificacao {
   lidaEm         DateTime?         @map("lida_em")
   criadoEm       DateTime          @default(now()) @map("criado_em")
 
-  usuarioMaria UsuarioMaria @relation(fields: [usuarioMariaId], references: [id], onDelete: Cascade)
-  solicitacao  Solicitacao? @relation(fields: [solicitacaoId], references: [id], onDelete: SetNull)
+  usuarioMaria UsuarioMaria? @relation(fields: [usuarioMariaId], references: [id], onDelete: Cascade)
+  solicitacao  Solicitacao?  @relation(fields: [solicitacaoId], references: [id], onDelete: SetNull)
 
   @@index([usuarioMariaId])
   @@index([solicitacaoId])
   @@index([status])
   @@index([canal])
   @@map("notificacoes")
+}
+
+/// Token de push (Expo Push Token) de um aparelho do solicitante.
+/// O mesmo token pode trocar de dono (logout/login no aparelho) — o upsert
+/// reatribui. `ativo=false` quando o Expo responder DeviceNotRegistered.
+model DeviceToken {
+  id             String   @id @default(uuid()) @db.Uuid
+  usuarioMariaId String   @map("usuario_maria_id") @db.Uuid
+  /// ExponentPushToken[...] — identifica o aparelho no Expo Push Service.
+  token          String   @unique
+  /// 'ios' | 'android' (informativo, vindo do app).
+  plataforma     String
+  ativo          Boolean  @default(true)
+  criadoEm       DateTime @default(now()) @map("criado_em")
+  atualizadoEm   DateTime @updatedAt @map("atualizado_em")
+
+  usuarioMaria UsuarioMaria @relation(fields: [usuarioMariaId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioMariaId])
+  @@map("device_tokens")
 }
 
 // ===================================================================
@@ -419,8 +506,15 @@ model AuditLog {
 model Conversa {
   id                String         @id @default(uuid()) @db.Uuid
   canal             CanalConversa  @default(WEB)
-  usuarioMariaId    String         @map("usuario_maria_id") @db.Uuid
+  /// Nullable: conversa de WhatsApp é anônima (não cria usuário no sistema);
+  /// vincula só se o número já pertencer a um UsuarioMaria cadastrado.
+  usuarioMariaId    String?        @map("usuario_maria_id") @db.Uuid
+  /// Contato externo do canal (telefone E.164 do WhatsApp). É a chave que
+  /// localiza a conversa ativa quando não há UsuarioMaria.
+  contatoExterno    String?        @map("contato_externo")
   fluxoChave        String         @map("fluxo_chave")
+  /// Versão do fluxo (banco) fixada no início da conversa. Null = fluxo hardcoded (fallback).
+  fluxoVersaoId     String?        @map("fluxo_versao_id") @db.Uuid
   noAtual           String?        @map("no_atual")
   estado            EstadoConversa @default(ABERTA)
   /// Snapshot das variáveis já coletadas no fluxo (nome, cpf, especialidade...).
@@ -430,13 +524,15 @@ model Conversa {
   ultimaInteracaoEm DateTime       @updatedAt @map("ultima_interacao_em")
   encerradaEm       DateTime?      @map("encerrada_em")
 
-  usuarioMaria UsuarioMaria @relation(fields: [usuarioMariaId], references: [id], onDelete: Cascade)
-  solicitacao  Solicitacao? @relation(fields: [solicitacaoId], references: [id], onDelete: SetNull)
+  usuarioMaria UsuarioMaria? @relation(fields: [usuarioMariaId], references: [id], onDelete: Cascade)
+  solicitacao  Solicitacao?  @relation(fields: [solicitacaoId], references: [id], onDelete: SetNull)
   mensagens    Mensagem[]
 
   @@index([usuarioMariaId])
+  @@index([contatoExterno])
   @@index([estado])
   @@index([ultimaInteracaoEm])
+  @@index([fluxoVersaoId])
   @@map("conversas")
 }
 
@@ -459,4 +555,129 @@ model Mensagem {
   @@index([conversaId])
   @@index([conversaId, criadoEm])
   @@map("mensagens")
+}
+
+// ===================================================================
+// INTEGRAÇÕES
+// ===================================================================
+
+/// Configuração de um canal de WhatsApp (uma linha por provedor).
+/// As credenciais (apiKey/accessToken etc.) ficam num JSON cifrado em
+/// `credenciaisCifradas` (AES-256-GCM) — nunca em texto puro.
+model IntegracaoCanal {
+  id                  String           @id @default(uuid()) @db.Uuid
+  provedor            ProvedorCanal    @unique
+  credenciaisCifradas String?          @map("credenciais_cifradas")
+  ativo               Boolean          @default(false)
+  status              StatusIntegracao @default(DESCONECTADA)
+  statusDetalhe       String?          @map("status_detalhe")
+  verificadoEm        DateTime?        @map("verificado_em")
+  criadoEm            DateTime         @default(now()) @map("criado_em")
+  atualizadoEm        DateTime         @updatedAt @map("atualizado_em")
+
+  @@map("integracoes_canal")
+}
+
+// ===================================================================
+// FLUXO DE ATENDIMENTO (versionado)
+// ===================================================================
+
+/// Agrupa as versões de um fluxo lógico (ex.: "Atendimento").
+model FluxoAtendimento {
+  id           String    @id @default(uuid()) @db.Uuid
+  nome         String
+  tipo         TipoFluxo @default(OUTRO)
+  descricao    String?
+  ativo        Boolean   @default(true)
+  /// Posição do card no quadro de fluxos do CRM (compartilhada). Null = auto-layout.
+  posicaoX     Int?      @map("posicao_x")
+  posicaoY     Int?      @map("posicao_y")
+  criadoEm     DateTime  @default(now()) @map("criado_em")
+  atualizadoEm DateTime  @updatedAt @map("atualizado_em")
+
+  versoes FluxoVersao[]
+
+  @@map("fluxos_atendimento")
+}
+
+/// Uma fotografia (rascunho/publicada) do fluxo. Publicar torna imutável.
+model FluxoVersao {
+  id                 String            @id @default(uuid()) @db.Uuid
+  fluxoAtendimentoId String            @map("fluxo_atendimento_id") @db.Uuid
+  numero             Int
+  status             StatusFluxoVersao @default(RASCUNHO)
+  publicadaEm        DateTime?         @map("publicada_em")
+  criadoPorCrmId     String?           @map("criado_por_crm_id") @db.Uuid
+  criadoEm           DateTime          @default(now()) @map("criado_em")
+  atualizadoEm       DateTime          @updatedAt @map("atualizado_em")
+
+  fluxo     FluxoAtendimento @relation(fields: [fluxoAtendimentoId], references: [id], onDelete: Cascade)
+  nos       FluxoNo[]
+  arestas   FluxoAresta[]
+  variaveis FluxoVariavel[]
+
+  @@unique([fluxoAtendimentoId, numero])
+  @@index([fluxoAtendimentoId])
+  @@index([status])
+  @@map("fluxos_versao")
+}
+
+/// Um passo do fluxo. `conteudo` carrega o type-specific (textos, opcoes, etc.).
+model FluxoNo {
+  id            String      @id @default(uuid()) @db.Uuid
+  fluxoVersaoId String      @map("fluxo_versao_id") @db.Uuid
+  chave         String
+  tipo          TipoNoFluxo
+  conteudo      Json        @default("{}")
+  posicaoX      Int         @default(0) @map("posicao_x")
+  posicaoY      Int         @default(0) @map("posicao_y")
+  ehInicial     Boolean     @default(false) @map("eh_inicial")
+  criadoEm      DateTime    @default(now()) @map("criado_em")
+  atualizadoEm  DateTime    @updatedAt @map("atualizado_em")
+
+  versao         FluxoVersao   @relation(fields: [fluxoVersaoId], references: [id], onDelete: Cascade)
+  arestasOrigem  FluxoAresta[] @relation("ArestaOrigem")
+  arestasDestino FluxoAresta[] @relation("ArestaDestino")
+
+  @@unique([fluxoVersaoId, chave])
+  @@index([fluxoVersaoId])
+  @@map("fluxos_no")
+}
+
+/// Transição entre nós; `condicao` decide quando a aresta é seguida.
+model FluxoAresta {
+  id            String   @id @default(uuid()) @db.Uuid
+  fluxoVersaoId String   @map("fluxo_versao_id") @db.Uuid
+  noOrigemId    String   @map("no_origem_id") @db.Uuid
+  noDestinoId   String   @map("no_destino_id") @db.Uuid
+  condicao      Json     @default("{}")
+  ordem         Int      @default(0)
+  criadoEm      DateTime @default(now()) @map("criado_em")
+  atualizadoEm  DateTime @updatedAt @map("atualizado_em")
+
+  versao    FluxoVersao @relation(fields: [fluxoVersaoId], references: [id], onDelete: Cascade)
+  noOrigem  FluxoNo     @relation("ArestaOrigem", fields: [noOrigemId], references: [id], onDelete: Cascade)
+  noDestino FluxoNo     @relation("ArestaDestino", fields: [noDestinoId], references: [id], onDelete: Cascade)
+
+  @@index([fluxoVersaoId])
+  @@index([noOrigemId])
+  @@map("fluxos_aresta")
+}
+
+/// Variável que a conversa coleta nesta versão do fluxo.
+model FluxoVariavel {
+  id            String            @id @default(uuid()) @db.Uuid
+  fluxoVersaoId String            @map("fluxo_versao_id") @db.Uuid
+  chave         String
+  rotulo        String
+  tipo          TipoVariavelFluxo @default(TEXTO)
+  obrigatoria   Boolean           @default(false)
+  criadoEm      DateTime          @default(now()) @map("criado_em")
+  atualizadoEm  DateTime          @updatedAt @map("atualizado_em")
+
+  versao FluxoVersao @relation(fields: [fluxoVersaoId], references: [id], onDelete: Cascade)
+
+  @@unique([fluxoVersaoId, chave])
+  @@index([fluxoVersaoId])
+  @@map("fluxos_variavel")
 }

@@ -22,7 +22,11 @@ export function buildPagination(query: {
   };
 }
 
-export function paginate<T>(items: T[], total: number, params: PaginationParams): PaginatedResult<T> {
+export function paginate<T>(
+  items: T[],
+  total: number,
+  params: PaginationParams,
+): PaginatedResult<T> {
   return {
     items,
     meta: {

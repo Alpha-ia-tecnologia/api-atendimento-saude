@@ -1,6 +1,8 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { StatusSolicitacao } from '@prisma/client';
 
+import { AUDIT_EVENT } from '../../../audit/application/events/audit.event';
 import { MinioService } from '../../../files/application/services/minio.service';
 import { PrismaService } from '../../../../shared/database/prisma/prisma.service';
 import { SolicitacaoResponseDto } from '../dtos/solicitacao-response.dto';
@@ -11,6 +13,7 @@ export class AssumirSolicitacaoUseCase {
   constructor(
     private readonly prisma: PrismaService,
     private readonly minio: MinioService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /** SOLICITADA → EM_ATENDIMENTO, registrando o operador responsável. */
@@ -34,6 +37,14 @@ export class AssumirSolicitacaoUseCase {
         agenteResponsavelCrmId: operadorId,
       },
       include: { especialidade: true, anexos: true, agenteResponsavel: true },
+    });
+
+    this.eventEmitter.emit(AUDIT_EVENT, {
+      userId: operadorId,
+      action: 'SOLICITACAO_ASSUMIDA',
+      resource: 'solicitacao',
+      resourceId: id,
+      metadata: { protocolo: atualizada.protocolo },
     });
 
     return mapearSolicitacao(atualizada, this.minio);

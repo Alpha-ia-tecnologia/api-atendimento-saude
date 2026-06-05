@@ -16,7 +16,9 @@ import { Fluxo, Variaveis } from './tipos';
 export const FLUXO_ATENDIMENTO_V1 = 'atendimento-v1';
 
 const primeiroNome = (v: Variaveis): string =>
-  String(v.nome ?? '').split(' ').filter(Boolean)[0] ?? '';
+  String(v.nome ?? '')
+    .split(' ')
+    .filter(Boolean)[0] ?? '';
 
 const resumoPerfil = (v: Variaveis): string => {
   const p = (v._perfil ?? {}) as Record<string, string>;
@@ -80,9 +82,7 @@ export const fluxoAtendimentoV1: Fluxo = {
     'info-vacinacao': {
       id: 'info-vacinacao',
       tipo: 'MENSAGEM',
-      textos: [
-        '🚧 Essa funcionalidade ainda está sendo preparada com muito carinho. Em breve!',
-      ],
+      textos: ['🚧 Essa funcionalidade ainda está sendo preparada com muito carinho. Em breve!'],
       proximo: 'voltar-menu',
     },
 
@@ -243,9 +243,7 @@ export const fluxoAtendimentoV1: Fluxo = {
     'fim-encerrar': {
       id: 'fim-encerrar',
       tipo: 'FIM',
-      textos: [
-        'Foi um prazer falar com você! 💚 A prefeitura de São José de Ribamar agradece.',
-      ],
+      textos: ['Foi um prazer falar com você! 💚 A prefeitura de São José de Ribamar agradece.'],
       opcoesFinais: [
         { id: 'nova-solicitacao', label: 'Fazer nova solicitação', emoji: '🔄', destaque: true },
       ],

@@ -66,6 +66,51 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   MINIO_REGION: string = 'us-east-1';
+
+  // ---- OCR de triagem do encaminhamento (Tesseract) ----
+  /** Liga/desliga a verificação OCR da foto do encaminhamento (kill-switch). */
+  @IsString()
+  @IsOptional()
+  OCR_HABILITADO: string = 'true';
+
+  /** Tentativas reprovadas antes de liberar a foto marcada pra revisão manual. */
+  @IsNumberString()
+  @IsOptional()
+  OCR_MAX_TENTATIVAS: string = '3';
+
+  /** Confiança média mínima do OCR (0-100) pra considerar a foto legível. */
+  @IsNumberString()
+  @IsOptional()
+  OCR_CONF_MIN: string = '50';
+
+  /** Mínimo de caracteres úteis (sem espaços) reconhecidos. */
+  @IsNumberString()
+  @IsOptional()
+  OCR_MIN_CHARS: string = '25';
+
+  /** Mínimo de palavras com boa confiança reconhecidas. */
+  @IsNumberString()
+  @IsOptional()
+  OCR_MIN_PALAVRAS: string = '6';
+
+  // ---- Integrações WhatsApp (Evolution / Meta Cloud) ----
+  /**
+   * Chave secreta para cifrar as credenciais dos provedores em repouso
+   * (AES-256-GCM). Opcional no boot — a tela de Integrações só exige quando
+   * for salvar/ler credenciais (erro claro se ausente nesse momento).
+   */
+  @IsString()
+  @IsOptional()
+  ENCRYPTION_KEY?: string;
+
+  /**
+   * URL pública do backend (ex.: https://api.seu-dominio.com). Usada para
+   * montar a URL do webhook do WhatsApp exibida no CRM. Se ausente, o CRM
+   * prefixa o caminho relativo com a origem que conhece.
+   */
+  @IsString()
+  @IsOptional()
+  PUBLIC_BASE_URL?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>) {

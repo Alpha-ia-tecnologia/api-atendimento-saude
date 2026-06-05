@@ -3,10 +3,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { MinioService } from '../../../files/application/services/minio.service';
 import { PrismaService } from '../../../../shared/database/prisma/prisma.service';
 import { mapearUsuarioMaria } from '../mappers/usuario-maria.mapper';
-import {
-  LoginCadastradoResponseDto,
-  LoginNovoResponseDto,
-} from '../dtos/auth-maria-response.dto';
+import { LoginCadastradoResponseDto, LoginNovoResponseDto } from '../dtos/auth-maria-response.dto';
 import { LoginMariaDto } from '../dtos/login-maria.dto';
 import { TokenMariaService } from '../services/token-maria.service';
 import { parseDataNascimentoBR, somenteDigitos } from '../utils/formatters';
@@ -19,9 +16,7 @@ export class LoginMariaUseCase {
     private readonly minio: MinioService,
   ) {}
 
-  async execute(
-    dto: LoginMariaDto,
-  ): Promise<LoginCadastradoResponseDto | LoginNovoResponseDto> {
+  async execute(dto: LoginMariaDto): Promise<LoginCadastradoResponseDto | LoginNovoResponseDto> {
     const cpfLimpo = somenteDigitos(dto.cpf);
     const dataNasc = parseDataNascimentoBR(dto.dataNascimento);
 
@@ -47,9 +42,7 @@ export class LoginMariaUseCase {
       usuario.dataNascimento.getUTCDate() === dataNasc.getUTCDate();
 
     if (!dataBate) {
-      throw new UnauthorizedException(
-        'CPF ou data de nascimento incorretos.',
-      );
+      throw new UnauthorizedException('CPF ou data de nascimento incorretos.');
     }
 
     if (!usuario.ativo) {

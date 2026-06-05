@@ -22,9 +22,7 @@ async function bootstrap() {
   // caso `*` precisa virar `true`.
   const corsOrigin = configService.get<string>('CORS_ORIGIN')?.trim();
   const origin =
-    !corsOrigin || corsOrigin === '*'
-      ? true
-      : corsOrigin.split(',').map((o) => o.trim());
+    !corsOrigin || corsOrigin === '*' ? true : corsOrigin.split(',').map((o) => o.trim());
   app.enableCors({ origin, credentials: true });
 
   app.useGlobalPipes(

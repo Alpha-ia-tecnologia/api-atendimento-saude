@@ -1,16 +1,8 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Request } from 'express';
 
 import { PrismaService } from '../../../../shared/database/prisma/prisma.service';
-import {
-  AuthenticatedCrm,
-  TokenCrmService,
-} from '../../application/services/token-crm.service';
+import { AuthenticatedCrm, TokenCrmService } from '../../application/services/token-crm.service';
 
 @Injectable()
 export class JwtCrmGuard implements CanActivate {
@@ -20,9 +12,7 @@ export class JwtCrmGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const req = context
-      .switchToHttp()
-      .getRequest<Request & { crmUser?: AuthenticatedCrm }>();
+    const req = context.switchToHttp().getRequest<Request & { crmUser?: AuthenticatedCrm }>();
 
     const header = req.headers.authorization;
     if (!header) throw new UnauthorizedException('Token não informado.');

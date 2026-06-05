@@ -71,9 +71,7 @@ export class SolicitacoesGestorController {
   @Get(':id')
   @ApiOperation({ summary: 'Detalhe de uma solicitação (para o gestor).' })
   @ApiOkResponse({ type: SolicitacaoResponseDto })
-  async detalhe(
-    @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<SolicitacaoResponseDto> {
+  async detalhe(@Param('id', ParseUUIDPipe) id: string): Promise<SolicitacaoResponseDto> {
     return this.obter.execute(id);
   }
 

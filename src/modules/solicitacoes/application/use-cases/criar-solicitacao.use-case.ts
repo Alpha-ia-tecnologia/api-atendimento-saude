@@ -1,17 +1,10 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import {
-  ParaQuem,
-  Prisma,
-  StatusSolicitacao,
-  TipoAnexo,
-  TipoEspecialidade,
-} from '@prisma/client';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { ParaQuem, Prisma, StatusSolicitacao, TipoAnexo, TipoEspecialidade } from '@prisma/client';
 
+import { AUDIT_EVENT } from '../../../audit/application/events/audit.event';
 import { MinioService } from '../../../files/application/services/minio.service';
+import { NotificarSolicitacaoService } from '../../../notificacoes/application/services/notificar-solicitacao.service';
 import { PrismaService } from '../../../../shared/database/prisma/prisma.service';
 import { CriarSolicitacaoDto } from '../dtos/criar-solicitacao.dto';
 import { SolicitacaoResponseDto } from '../dtos/solicitacao-response.dto';
@@ -25,18 +18,30 @@ export class CriarSolicitacaoUseCase {
     private readonly prisma: PrismaService,
     private readonly protocoloService: ProtocoloService,
     private readonly minio: MinioService,
+    private readonly notificar: NotificarSolicitacaoService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
+  /**
+   * `solicitanteId` null = solicitação ANÔNIMA (conversa de WhatsApp sem
+   * cadastro): não há usuário pra vincular e o snapshot do paciente vem
+   * obrigatoriamente do payload (`paraQuem=OUTRA`).
+   */
   async execute(
-    solicitanteId: string,
+    solicitanteId: string | null,
     dto: CriarSolicitacaoDto,
   ): Promise<SolicitacaoResponseDto> {
     // 1. Carregar solicitante (precisa pros dados do snapshot quando paraQuem=EU)
-    const solicitante = await this.prisma.usuarioMaria.findUnique({
-      where: { id: solicitanteId },
-    });
-    if (!solicitante || !solicitante.ativo) {
+    const solicitante = solicitanteId
+      ? await this.prisma.usuarioMaria.findUnique({ where: { id: solicitanteId } })
+      : null;
+    if (solicitanteId && (!solicitante || !solicitante.ativo)) {
       throw new NotFoundException('Solicitante não encontrado ou inativo.');
+    }
+    if (!solicitanteId && dto.paraQuem === ParaQuem.EU) {
+      throw new BadRequestException(
+        'Solicitação anônima precisa dos dados do paciente (paraQuem=OUTRA).',
+      );
     }
 
     // 2. Validar especialidade
@@ -47,25 +52,16 @@ export class CriarSolicitacaoUseCase {
       throw new NotFoundException('Especialidade não encontrada.');
     }
     if (!especialidade.disponivel) {
-      throw new BadRequestException(
-        'Essa especialidade não está disponível no momento.',
-      );
+      throw new BadRequestException('Essa especialidade não está disponível no momento.');
     }
 
     // 2.1 Regra: consulta exige tipoConsulta (PRIMEIRA ou RETORNO).
     //     Exame/Outro ignora — guardamos null mesmo que venha preenchido,
     //     pra evitar dados inconsistentes.
     const tipoConsulta =
-      especialidade.tipo === TipoEspecialidade.CONSULTA
-        ? dto.tipoConsulta ?? null
-        : null;
-    if (
-      especialidade.tipo === TipoEspecialidade.CONSULTA &&
-      !tipoConsulta
-    ) {
-      throw new BadRequestException(
-        'Pra consultas, informe se é primeira vez ou retorno.',
-      );
+      especialidade.tipo === TipoEspecialidade.CONSULTA ? (dto.tipoConsulta ?? null) : null;
+    if (especialidade.tipo === TipoEspecialidade.CONSULTA && !tipoConsulta) {
+      throw new BadRequestException('Pra consultas, informe se é primeira vez ou retorno.');
     }
 
     // 3. Resolver dados do paciente conforme paraQuem
@@ -78,7 +74,7 @@ export class CriarSolicitacaoUseCase {
       telefoneWhatsapp: string | null;
     };
 
-    if (dto.paraQuem === ParaQuem.EU) {
+    if (dto.paraQuem === ParaQuem.EU && solicitante) {
       // Copia do UsuarioMaria autenticado. Dados do `paciente` do payload
       // são IGNORADOS pra evitar que o cliente injete dados de outra pessoa.
       pacienteSnapshot = {
@@ -96,9 +92,7 @@ export class CriarSolicitacaoUseCase {
           'Quando paraQuem=OUTRA, os dados do paciente são obrigatórios.',
         );
       }
-      const telLimpo = dto.paciente.telefone
-        ? somenteDigitos(dto.paciente.telefone)
-        : null;
+      const telLimpo = dto.paciente.telefone ? somenteDigitos(dto.paciente.telefone) : null;
       pacienteSnapshot = {
         nome: dto.paciente.nome.trim(),
         cpf: somenteDigitos(dto.paciente.cpf),
@@ -129,7 +123,9 @@ export class CriarSolicitacaoUseCase {
       pacienteTelefone: pacienteSnapshot.telefone,
       pacienteTelefoneWhatsapp: pacienteSnapshot.telefoneWhatsapp,
       dataSolicitada: new Date(),
-      solicitante: { connect: { id: solicitanteId } },
+      revisarAnexo: dto.encaminhamentoIlegivel === true,
+      // Anônima (WhatsApp sem cadastro): sem vínculo de solicitante/enviadoPor.
+      ...(solicitanteId ? { solicitante: { connect: { id: solicitanteId } } } : {}),
       especialidade: { connect: { id: especialidade.id } },
       ...(dto.encaminhamentoUrl
         ? {
@@ -137,7 +133,7 @@ export class CriarSolicitacaoUseCase {
               create: {
                 url: dto.encaminhamentoUrl,
                 tipo: this.adivinharTipoAnexo(dto.encaminhamentoUrl),
-                enviadoPor: { connect: { id: solicitanteId } },
+                ...(solicitanteId ? { enviadoPor: { connect: { id: solicitanteId } } } : {}),
               },
             },
           }
@@ -147,6 +143,18 @@ export class CriarSolicitacaoUseCase {
     const criada = await this.prisma.solicitacao.create({
       data: dataCriacao,
       include: { especialidade: true, anexos: true },
+    });
+
+    // H4.3 — registra a notificação de criação no inbox in-app. Nunca lança.
+    await this.notificar.solicitacaoCriada(criada);
+
+    // Criada pelo solicitante (App/Web/WhatsApp), não por operador → userId null.
+    this.eventEmitter.emit(AUDIT_EVENT, {
+      userId: null,
+      action: 'SOLICITACAO_CRIADA',
+      resource: 'solicitacao',
+      resourceId: criada.id,
+      metadata: { protocolo, origem: dto.origem, solicitanteId },
     });
 
     return mapearSolicitacao(criada, this.minio);

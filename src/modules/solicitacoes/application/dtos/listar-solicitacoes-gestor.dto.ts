@@ -30,6 +30,11 @@ export class ListarSolicitacoesGestorDto {
   @IsUUID()
   especialidadeId?: string;
 
+  @ApiPropertyOptional({ description: 'Filtra por operador responsável (UUID).' })
+  @IsOptional()
+  @IsUUID()
+  agenteResponsavelCrmId?: string;
+
   @ApiPropertyOptional({ enum: OrigemSolicitacao })
   @IsOptional()
   @IsEnum(OrigemSolicitacao)
@@ -44,6 +49,11 @@ export class ListarSolicitacoesGestorDto {
   @IsOptional()
   @IsString()
   ate?: string;
+
+  @ApiPropertyOptional({ description: 'Filtra por protocolo (correspondência parcial).' })
+  @IsOptional()
+  @IsString()
+  protocolo?: string;
 
   @ApiPropertyOptional({ description: 'Busca por nome, CPF ou protocolo.' })
   @IsOptional()

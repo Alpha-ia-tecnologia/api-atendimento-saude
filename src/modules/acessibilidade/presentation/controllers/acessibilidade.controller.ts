@@ -1,18 +1,5 @@
-import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Patch,
-  UseGuards,
-} from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOkResponse,
-  ApiOperation,
-  ApiTags,
-} from '@nestjs/swagger';
+import { Body, Controller, Get, HttpCode, HttpStatus, Patch, UseGuards } from '@nestjs/common';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import type { AuthenticatedMaria } from '../../../auth-maria/application/services/token-maria.service';
 import { MariaUser } from '../../../auth-maria/presentation/decorators/maria-user.decorator';
@@ -41,9 +28,7 @@ export class AcessibilidadeController {
       'cuidamos só de escala de fonte, alto contraste e narração.',
   })
   @ApiOkResponse({ type: AcessibilidadeResponseDto })
-  async get(
-    @MariaUser() user: AuthenticatedMaria,
-  ): Promise<AcessibilidadeResponseDto> {
+  async get(@MariaUser() user: AuthenticatedMaria): Promise<AcessibilidadeResponseDto> {
     return this.obter.execute(user.usuarioMariaId);
   }
 

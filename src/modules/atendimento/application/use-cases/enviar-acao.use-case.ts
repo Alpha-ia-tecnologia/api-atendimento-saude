@@ -9,6 +9,7 @@ import {
 
 import { PrismaService } from '../../../../shared/database/prisma/prisma.service';
 import { AcaoEntrada, FlowEngineService } from '../services/flow-engine.service';
+import { FluxoResolverService } from '../services/fluxo-resolver.service';
 import { EnviarAcaoDto, TipoAcao } from '../dtos/enviar-acao.dto';
 import { montarPasso } from '../mappers/passo.mapper';
 import { PassoConversaResponseDto } from '../dtos/passo-conversa-response.dto';
@@ -18,6 +19,7 @@ export class EnviarAcaoUseCase {
   constructor(
     private readonly prisma: PrismaService,
     private readonly engine: FlowEngineService,
+    private readonly resolver: FluxoResolverService,
   ) {}
 
   async execute(
@@ -40,6 +42,9 @@ export class EnviarAcaoUseCase {
 
     const acao = this.mapearAcao(dto);
 
+    // Usa a MESMA versão fixada no início (pinning): publicar não muda esta conversa.
+    const fluxo = await this.resolver.resolverParaConversa(conversa.fluxoVersaoId);
+
     const passo = await this.engine.processar(
       {
         usuarioMariaId,
@@ -48,13 +53,12 @@ export class EnviarAcaoUseCase {
         canal: conversa.canal,
       },
       acao,
+      fluxo,
     );
 
     const encerrada = passo.estado === 'ENCERRADA';
     const variaveis = passo.variaveis as Record<string, unknown>;
-    const solicitacaoId = variaveis._solicitacaoId
-      ? String(variaveis._solicitacaoId)
-      : null;
+    const solicitacaoId = variaveis._solicitacaoId ? String(variaveis._solicitacaoId) : null;
 
     await this.prisma.$transaction([
       // Mensagem de entrada (o que o solicitante fez)

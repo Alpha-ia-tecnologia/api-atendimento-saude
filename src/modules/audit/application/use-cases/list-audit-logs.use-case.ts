@@ -17,9 +17,9 @@ export class ListAuditLogsUseCase {
     const pagination = buildPagination(query);
     const result = await this.auditLogRepository.findMany({
       ...pagination,
-      userId: query.userId,
-      action: query.action,
-      resource: query.resource,
+      usuarioCrmId: query.usuarioCrmId,
+      acao: query.acao,
+      recurso: query.recurso,
       from: query.from,
       to: query.to,
     });

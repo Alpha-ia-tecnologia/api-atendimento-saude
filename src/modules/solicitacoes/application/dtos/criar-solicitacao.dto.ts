@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsEnum,
   IsOptional,
   IsString,
@@ -64,4 +65,13 @@ export class CriarSolicitacaoDto {
   @IsString()
   @IsUrl({ require_protocol: true })
   encaminhamentoUrl?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'true quando o OCR de triagem reprovou a foto além do limite de tentativas — ' +
+      'a solicitação é criada mas marcada pra revisão manual do operador.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  encaminhamentoIlegivel?: boolean;
 }

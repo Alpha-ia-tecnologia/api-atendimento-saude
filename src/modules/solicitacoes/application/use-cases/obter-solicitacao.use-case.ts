@@ -12,10 +12,7 @@ export class ObterSolicitacaoUseCase {
     private readonly minio: MinioService,
   ) {}
 
-  async execute(
-    solicitanteId: string,
-    solicitacaoId: string,
-  ): Promise<SolicitacaoResponseDto> {
+  async execute(solicitanteId: string, solicitacaoId: string): Promise<SolicitacaoResponseDto> {
     const solicitacao = await this.prisma.solicitacao.findFirst({
       where: { id: solicitacaoId, solicitanteId },
       include: { especialidade: true, anexos: true },

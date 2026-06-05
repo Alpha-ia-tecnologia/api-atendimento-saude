@@ -13,9 +13,7 @@ export class RefreshCrmUseCase {
   ) {}
 
   async execute(dto: RefreshCrmDto): Promise<AuthCrmResponseDto> {
-    const sessaoInvalida = new UnauthorizedException(
-      'Sessão expirada. Faça login novamente.',
-    );
+    const sessaoInvalida = new UnauthorizedException('Sessão expirada. Faça login novamente.');
 
     const payload = await this.tokenService.verifyRefreshToken(dto.refreshToken);
 
@@ -30,10 +28,7 @@ export class RefreshCrmUseCase {
     });
     if (!registro) throw sessaoInvalida;
 
-    const confere = this.tokenService.compareRefreshToken(
-      dto.refreshToken,
-      registro.tokenHash,
-    );
+    const confere = this.tokenService.compareRefreshToken(dto.refreshToken, registro.tokenHash);
     if (!confere) throw sessaoInvalida;
 
     const usuario = await this.prisma.usuarioCrm.findUnique({

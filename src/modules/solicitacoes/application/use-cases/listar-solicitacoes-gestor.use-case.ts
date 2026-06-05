@@ -36,9 +36,7 @@ export class ListarSolicitacoesGestorUseCase {
       this.prisma.solicitacao.count({ where }),
     ]);
 
-    const items = await Promise.all(
-      registros.map((s) => mapearSolicitacao(s, this.minio)),
-    );
+    const items = await Promise.all(registros.map((s) => mapearSolicitacao(s, this.minio)));
 
     return {
       items,
@@ -51,7 +49,11 @@ export class ListarSolicitacoesGestorUseCase {
 
     if (f.status) where.status = f.status;
     if (f.especialidadeId) where.especialidadeId = f.especialidadeId;
+    if (f.agenteResponsavelCrmId) where.agenteResponsavelCrmId = f.agenteResponsavelCrmId;
     if (f.origem) where.origem = f.origem;
+
+    const protocolo = f.protocolo?.trim();
+    if (protocolo) where.protocolo = { contains: protocolo, mode: 'insensitive' };
 
     if (f.de || f.ate) {
       const criadoEm: Prisma.DateTimeFilter = {};

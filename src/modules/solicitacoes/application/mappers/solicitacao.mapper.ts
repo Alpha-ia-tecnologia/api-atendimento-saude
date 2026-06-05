@@ -70,6 +70,7 @@ export async function mapearSolicitacao(
     motivoCancelamento: s.motivoCancelamento,
     encaminhamentoUrl,
     agendamentoPdfUrl,
+    revisarAnexo: s.revisarAnexo,
     agenteResponsavel: s.agenteResponsavel
       ? { id: s.agenteResponsavel.id, nomeCompleto: s.agenteResponsavel.nomeCompleto }
       : null,

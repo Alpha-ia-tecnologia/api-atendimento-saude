@@ -82,6 +82,12 @@ export class SolicitacaoResponseDto {
   })
   agendamentoPdfUrl!: string | null;
 
+  @ApiProperty({
+    description:
+      'true quando o OCR de triagem reprovou a foto além do limite — operador deve revisar a imagem.',
+  })
+  revisarAnexo!: boolean;
+
   @ApiPropertyOptional({
     nullable: true,
     type: AgenteResponsavelDto,

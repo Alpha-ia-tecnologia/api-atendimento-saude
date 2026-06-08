@@ -10,6 +10,7 @@ import { AtendimentoModule } from './modules/atendimento/atendimento.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthCrmModule } from './modules/auth-crm/auth-crm.module';
 import { AuthMariaModule } from './modules/auth-maria/auth-maria.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { EspecialidadesModule } from './modules/especialidades/especialidades.module';
 import { FluxosModule } from './modules/fluxos/fluxos.module';
 import { IntegracoesModule } from './modules/integracoes/integracoes.module';
@@ -35,6 +36,7 @@ import { UsuariosCrmModule } from './modules/usuarios-crm/usuarios-crm.module';
     AuthMariaModule,
     AuthCrmModule,
     UsuariosCrmModule,
+    DashboardModule,
     AcessibilidadeModule,
     EspecialidadesModule,
     SolicitacoesModule,

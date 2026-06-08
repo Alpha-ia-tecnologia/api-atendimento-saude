@@ -64,6 +64,10 @@ COPY --from=prod-deps --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder   --chown=nestjs:nodejs /app/dist ./dist
 COPY --from=builder   --chown=nestjs:nodejs /app/prisma ./prisma
 COPY --chown=nestjs:nodejs package.json ./
+# Modelo do Tesseract (OCR do encaminhamento). Sem isso, o worker tenta baixar
+# o traineddata + WASM de um CDN em runtime e o upload pode travar/estourar o
+# timeout do gateway (502). O serviço lê de ./assets/tessdata (process.cwd()).
+COPY --chown=nestjs:nodejs assets ./assets
 
 USER nestjs
 

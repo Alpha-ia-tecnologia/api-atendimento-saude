@@ -41,6 +41,11 @@ export class EnvironmentVariables {
   @IsNumberString()
   BCRYPT_SALT_ROUNDS: string = '10';
 
+  /** Liga/desliga o seed automático no boot (idempotente). `false` desativa. */
+  @IsString()
+  @IsOptional()
+  SEED_ON_BOOT: string = 'true';
+
   @IsString()
   @IsOptional()
   CORS_ORIGIN?: string;

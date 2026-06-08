@@ -15,6 +15,7 @@ import { EspecialidadesModule } from './modules/especialidades/especialidades.mo
 import { FluxosModule } from './modules/fluxos/fluxos.module';
 import { IntegracoesModule } from './modules/integracoes/integracoes.module';
 import { NotificacoesModule } from './modules/notificacoes/notificacoes.module';
+import { SeedModule } from './modules/seed/seed.module';
 import { SolicitacoesModule } from './modules/solicitacoes/solicitacoes.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
 import { UsuariosCrmModule } from './modules/usuarios-crm/usuarios-crm.module';
@@ -46,6 +47,7 @@ import { UsuariosCrmModule } from './modules/usuarios-crm/usuarios-crm.module';
     IntegracoesModule,
     FluxosModule,
     AuditModule,
+    SeedModule,
   ],
 })
 export class AppModule {}

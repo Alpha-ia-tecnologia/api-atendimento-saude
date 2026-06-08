@@ -19,10 +19,12 @@ import { PerfilCrm } from '../../../auth-crm/presentation/decorators/perfil-crm.
 import { JwtCrmGuard } from '../../../auth-crm/presentation/guards/jwt-crm.guard';
 import { PerfilGuard } from '../../../auth-crm/presentation/guards/perfil.guard';
 import { AtivarProvedorDto } from '../../application/dtos/ativar-provedor.dto';
+import { EnviarTesteDto } from '../../application/dtos/enviar-teste.dto';
 import { SalvarEvolutionDto } from '../../application/dtos/salvar-evolution.dto';
 import { SalvarMetaDto } from '../../application/dtos/salvar-meta.dto';
 import { AtivarIntegracaoUseCase } from '../../application/use-cases/ativar-integracao.use-case';
 import { ConectarEvolutionUseCase } from '../../application/use-cases/conectar-evolution.use-case';
+import { EnviarTesteUseCase } from '../../application/use-cases/enviar-teste.use-case';
 import { ObterIntegracoesUseCase } from '../../application/use-cases/obter-integracoes.use-case';
 import { SalvarIntegracaoUseCase } from '../../application/use-cases/salvar-integracao.use-case';
 import { StatusCanalUseCase } from '../../application/use-cases/status-canal.use-case';
@@ -45,6 +47,7 @@ export class IntegracoesController {
     private readonly ativar: AtivarIntegracaoUseCase,
     private readonly conectar: ConectarEvolutionUseCase,
     private readonly statusCanal: StatusCanalUseCase,
+    private readonly enviarTeste: EnviarTesteUseCase,
   ) {}
 
   @Get()
@@ -93,6 +96,13 @@ export class IntegracoesController {
   async ativarProvedor(@Body() dto: AtivarProvedorDto) {
     await this.ativar.execute(dto.provedor);
     return this.obter.execute();
+  }
+
+  @Post('enviar-teste')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Envia uma mensagem de teste pelo provedor ativo (envio real).' })
+  async enviarTesteMensagem(@Body() dto: EnviarTesteDto) {
+    return this.enviarTeste.execute(dto.numero);
   }
 
   private normalizarProvedor(valor: string): ProvedorCanal {

@@ -16,6 +16,7 @@ import { IntegracoesModule } from './modules/integracoes/integracoes.module';
 import { NotificacoesModule } from './modules/notificacoes/notificacoes.module';
 import { SolicitacoesModule } from './modules/solicitacoes/solicitacoes.module';
 import { UploadsModule } from './modules/uploads/uploads.module';
+import { UsuariosCrmModule } from './modules/usuarios-crm/usuarios-crm.module';
 
 // NOTE: módulos do CRM antigos (auth, users, organizations, roles, permissions)
 // foram escritos pra um schema anterior em camelCase inglês. Estão desabilitados
@@ -33,6 +34,7 @@ import { UploadsModule } from './modules/uploads/uploads.module';
     SharedModule,
     AuthMariaModule,
     AuthCrmModule,
+    UsuariosCrmModule,
     AcessibilidadeModule,
     EspecialidadesModule,
     SolicitacoesModule,

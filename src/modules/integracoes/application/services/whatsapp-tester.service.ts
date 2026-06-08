@@ -130,12 +130,22 @@ export class WhatsappTesterService {
     const headers = { 'Content-Type': 'application/json', apikey: cred.apiKey };
     const eventos = ['MESSAGES_UPSERT'];
 
+    // `webhookByEvents: false` é OBRIGATÓRIO: com true a Evolution anexa o nome
+    // do evento na URL (…/webhooks/whatsapp/messages-upsert) e bate em 404 no
+    // nosso controller (que só atende a raiz). `webhookBase64: true` faz a mídia
+    // vir em base64 pra re-hospedarmos no MinIO (fluxo de anexo/upload).
     // Formato v2: { webhook: { ... } }. Se a instância for v1, o corpo é achatado.
     let resp = await this.fetchComTimeout(url, {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        webhook: { enabled: true, url: webhookUrl, webhookByEvents: false, events: eventos },
+        webhook: {
+          enabled: true,
+          url: webhookUrl,
+          webhookByEvents: false,
+          webhookBase64: true,
+          events: eventos,
+        },
       }),
     });
     if (resp.status === 400) {
@@ -146,6 +156,7 @@ export class WhatsappTesterService {
           enabled: true,
           url: webhookUrl,
           webhook_by_events: false,
+          webhook_base64: true,
           events: eventos,
         }),
       });

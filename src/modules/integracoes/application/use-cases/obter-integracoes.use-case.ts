@@ -6,6 +6,7 @@ import { PrismaService } from '../../../../shared/database/prisma/prisma.service
 import { CryptoService } from '../../../../shared/crypto/crypto.service';
 import { lerCredenciais, montarProvedorEstado } from '../integracao.mapper';
 import { EvolutionCredenciais, IntegracoesEstado, MetaCredenciais } from '../integracao.types';
+import { montarWebhookUrl } from '../webhook-url.helper';
 
 @Injectable()
 export class ObterIntegracoesUseCase {
@@ -26,10 +27,8 @@ export class ObterIntegracoesUseCase {
     );
     const meta = lerCredenciais<MetaCredenciais>(this.crypto, metaRow?.credenciaisCifradas ?? null);
 
-    const base = this.config.get<string>('PUBLIC_BASE_URL')?.trim();
-    const webhookUrl = base
-      ? `${base.replace(/\/+$/, '')}/webhooks/whatsapp`
-      : '/webhooks/whatsapp';
+    const webhookUrl =
+      montarWebhookUrl(this.config.get<string>('PUBLIC_BASE_URL')) ?? '/webhooks/whatsapp';
 
     return {
       chaveConfigurada: this.crypto.disponivel(),

@@ -115,6 +115,49 @@ export class WhatsappTesterService {
     };
   }
 
+  /**
+   * Registra na instância da Evolution o webhook que recebe as mensagens
+   * (`POST /webhook/set/{instance}`), assinando só `MESSAGES_UPSERT` — o único
+   * evento que o `EvolutionAdapter.normalizarWebhook` interpreta. Sem isso a
+   * instância parea o aparelho mas nunca entrega as mensagens à API.
+   *
+   * `webhookUrl` é a URL pública do backend (montada de `PUBLIC_BASE_URL`); a
+   * Evolution precisa alcançá-la, então não pode ser `localhost`.
+   */
+  async configurarWebhookEvolution(cred: EvolutionCredenciais, webhookUrl: string): Promise<void> {
+    const base = cred.baseUrl.replace(/\/+$/, '');
+    const url = `${base}/webhook/set/${encodeURIComponent(cred.instance)}`;
+    const headers = { 'Content-Type': 'application/json', apikey: cred.apiKey };
+    const eventos = ['MESSAGES_UPSERT'];
+
+    // Formato v2: { webhook: { ... } }. Se a instância for v1, o corpo é achatado.
+    let resp = await this.fetchComTimeout(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        webhook: { enabled: true, url: webhookUrl, webhookByEvents: false, events: eventos },
+      }),
+    });
+    if (resp.status === 400) {
+      resp = await this.fetchComTimeout(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          enabled: true,
+          url: webhookUrl,
+          webhook_by_events: false,
+          events: eventos,
+        }),
+      });
+    }
+    if (!resp.ok) {
+      const corpo = await resp.text().catch(() => '');
+      throw new Error(
+        `Falha ao registrar o webhook na Evolution (HTTP ${resp.status}): ${corpo.slice(0, 200)}`,
+      );
+    }
+  }
+
   private async fetchComTimeout(url: string, init: RequestInit): Promise<Response> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), WhatsappTesterService.TIMEOUT_MS);

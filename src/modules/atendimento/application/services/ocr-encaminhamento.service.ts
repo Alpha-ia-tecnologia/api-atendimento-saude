@@ -44,19 +44,19 @@ export class OcrEncaminhamentoService implements OnModuleDestroy {
   private readonly confMin: number;
   private readonly minChars: number;
   private readonly minPalavras: number;
+  /** Teto de tempo de um `recognize`; estourou → fail-open e recria o worker. */
+  private readonly timeoutMs: number;
 
   constructor(private readonly config: ConfigService) {
     this.habilitado = this.config.get<string>('OCR_HABILITADO', 'true') !== 'false';
     this.confMin = Number(this.config.get<string>('OCR_CONF_MIN', '50'));
     this.minChars = Number(this.config.get<string>('OCR_MIN_CHARS', '25'));
     this.minPalavras = Number(this.config.get<string>('OCR_MIN_PALAVRAS', '6'));
+    this.timeoutMs = Number(this.config.get<string>('OCR_TIMEOUT_MS', '15000'));
   }
 
   async onModuleDestroy(): Promise<void> {
-    if (this.worker) {
-      await this.worker.terminate();
-      this.worker = null;
-    }
+    await this.resetWorker();
   }
 
   /**
@@ -112,8 +112,46 @@ export class OcrEncaminhamentoService implements OnModuleDestroy {
     // Encadeia na fila pra um job por vez (worker é single-threaded).
     const tarefa = this.fila.then(() => worker.recognize(bytes));
     this.fila = tarefa.catch(() => undefined);
-    const { data } = await tarefa;
-    return { texto: data.text ?? '', confianca: data.confidence ?? 0 };
+    try {
+      const { data } = await this.comTimeout(tarefa, this.timeoutMs);
+      return { texto: data.text ?? '', confianca: data.confidence ?? 0 };
+    } catch (err) {
+      // Timeout ou worker morto: descarta o worker (recria no próximo upload) e
+      // zera a fila pra não pendurar as próximas imagens atrás do job travado.
+      // Sem isso, um worker que para de responder congela toda a conversa.
+      await this.resetWorker();
+      throw err;
+    }
+  }
+
+  /** Rejeita após `ms` se `p` não tiver assentado; limpa o timer nos dois casos. */
+  private comTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`OCR excedeu ${ms}ms`)), ms);
+      p.then(
+        (v) => {
+          clearTimeout(timer);
+          resolve(v);
+        },
+        (e) => {
+          clearTimeout(timer);
+          reject(e as Error);
+        },
+      );
+    });
+  }
+
+  /**
+   * Descarta o worker atual e zera a fila. Zera o estado ANTES do `terminate()`
+   * (best-effort) pra que uma chamada concorrente já recrie um worker limpo em
+   * vez de enfileirar atrás de um job travado.
+   */
+  private async resetWorker(): Promise<void> {
+    const anterior = this.worker;
+    this.worker = null;
+    this.iniciando = null;
+    this.fila = Promise.resolve();
+    if (anterior) await anterior.terminate().catch(() => undefined);
   }
 
   private obterWorker(): Promise<Worker> {

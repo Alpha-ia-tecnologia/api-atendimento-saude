@@ -70,9 +70,12 @@ export class MinioService implements OnModuleInit {
    * Baixa o objeto inteiro como Buffer. Usado pra análise local (OCR) —
    * a foto já subiu pelo /uploads, aqui recuperamos os bytes pelo `key`.
    */
-  async baixarBytes(key: string): Promise<Buffer> {
+  async baixarBytes(key: string, timeoutMs = 15_000): Promise<Buffer> {
+    // Timeout aborta um download pendurado (rede/MinIO fora) — sem ele, a request
+    // do webhook (e o OCR) ficaria presa indefinidamente. O caller faz fail-open.
     const resposta = await this.client.send(
       new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+      { abortSignal: AbortSignal.timeout(timeoutMs) },
     );
     const bytes = await resposta.Body!.transformToByteArray();
     return Buffer.from(bytes);

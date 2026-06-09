@@ -19,11 +19,13 @@ import { CrmUser } from '../../../auth-crm/presentation/decorators/crm-user.deco
 import { PerfilCrm } from '../../../auth-crm/presentation/decorators/perfil-crm.decorator';
 import { JwtCrmGuard } from '../../../auth-crm/presentation/guards/jwt-crm.guard';
 import { PerfilGuard } from '../../../auth-crm/presentation/guards/perfil.guard';
+import { ClonarCanalDto } from '../../application/dtos/clonar-canal.dto';
 import { CriarFluxoDto } from '../../application/dtos/criar-fluxo.dto';
 import { CriarVersaoDto } from '../../application/dtos/criar-versao.dto';
 import { MoverFluxoDto } from '../../application/dtos/mover-fluxo.dto';
 import { SalvarRascunhoDto } from '../../application/dtos/salvar-rascunho.dto';
 import { SimularDto } from '../../application/dtos/simular.dto';
+import { ClonarCanalUseCase } from '../../application/use-cases/clonar-canal.use-case';
 import { CriarFluxoUseCase } from '../../application/use-cases/criar-fluxo.use-case';
 import { CriarVersaoUseCase } from '../../application/use-cases/criar-versao.use-case';
 import { ListarFluxosUseCase } from '../../application/use-cases/listar-fluxos.use-case';
@@ -48,6 +50,7 @@ export class FluxosController {
     private readonly salvar: SalvarRascunhoUseCase,
     private readonly publicar: PublicarVersaoUseCase,
     private readonly simulador: SimuladorFluxoService,
+    private readonly clonarCanalUseCase: ClonarCanalUseCase,
   ) {}
 
   @Get()
@@ -114,7 +117,19 @@ export class FluxosController {
       noAtual: dto.noAtual,
       variaveis: dto.variaveis,
       acao: dto.acao,
+      canal: dto.canal,
     });
+  }
+
+  @Post(':id/versoes/:numero/clonar-canal')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Copia o grafo de um canal para outro (ex.: Web/App → WhatsApp).' })
+  async clonarCanal(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('numero', ParseIntPipe) numero: number,
+    @Body() dto: ClonarCanalDto,
+  ) {
+    return this.clonarCanalUseCase.execute(id, numero, dto.de, dto.para);
   }
 
   @Post(':id/versoes/:numero/publicar')

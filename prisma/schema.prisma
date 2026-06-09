@@ -153,6 +153,7 @@ enum TipoNoFluxo {
   PERGUNTA_TEXTO
   UPLOAD
   ACAO_CRIAR_SOLICITACAO
+  REDIRECIONAR
   FIM
 }
 
@@ -161,6 +162,13 @@ enum StatusFluxoVersao {
   RASCUNHO
   PUBLICADA
   ARQUIVADA
+}
+
+/// Grafo de canal dentro de uma versão: Web/App e WhatsApp são editados
+/// separadamente (podem ser fluxos completamente diferentes).
+enum CanalFluxo {
+  WEB_APP
+  WHATSAPP
 }
 
 /// Tipo de uma variável declarada pelo fluxo.
@@ -515,6 +523,9 @@ model Conversa {
   fluxoChave        String         @map("fluxo_chave")
   /// Versão do fluxo (banco) fixada no início da conversa. Null = fluxo hardcoded (fallback).
   fluxoVersaoId     String?        @map("fluxo_versao_id") @db.Uuid
+  /// Instância de WhatsApp que recebeu a conversa: respostas (fluxo e gestor)
+  /// saem por ela por padrão. Null em conversas legadas / Web/App → usa a padrão.
+  instanciaCanalId  String?        @map("instancia_canal_id") @db.Uuid
   noAtual           String?        @map("no_atual")
   estado            EstadoConversa @default(ABERTA)
   /// Snapshot das variáveis já coletadas no fluxo (nome, cpf, especialidade...).
@@ -524,15 +535,17 @@ model Conversa {
   ultimaInteracaoEm DateTime       @updatedAt @map("ultima_interacao_em")
   encerradaEm       DateTime?      @map("encerrada_em")
 
-  usuarioMaria UsuarioMaria? @relation(fields: [usuarioMariaId], references: [id], onDelete: Cascade)
-  solicitacao  Solicitacao?  @relation(fields: [solicitacaoId], references: [id], onDelete: SetNull)
-  mensagens    Mensagem[]
+  usuarioMaria   UsuarioMaria?   @relation(fields: [usuarioMariaId], references: [id], onDelete: Cascade)
+  solicitacao    Solicitacao?    @relation(fields: [solicitacaoId], references: [id], onDelete: SetNull)
+  instanciaCanal InstanciaCanal? @relation(fields: [instanciaCanalId], references: [id], onDelete: SetNull)
+  mensagens      Mensagem[]
 
   @@index([usuarioMariaId])
   @@index([contatoExterno])
   @@index([estado])
   @@index([ultimaInteracaoEm])
   @@index([fluxoVersaoId])
+  @@index([instanciaCanalId])
   @@map("conversas")
 }
 
@@ -561,20 +574,31 @@ model Mensagem {
 // INTEGRAÇÕES
 // ===================================================================
 
-/// Configuração de um canal de WhatsApp (uma linha por provedor).
-/// As credenciais (apiKey/accessToken etc.) ficam num JSON cifrado em
-/// `credenciaisCifradas` (AES-256-GCM) — nunca em texto puro.
-model IntegracaoCanal {
-  id                  String           @id @default(uuid()) @db.Uuid
-  provedor            ProvedorCanal    @unique
-  credenciaisCifradas String?          @map("credenciais_cifradas")
-  ativo               Boolean          @default(false)
-  status              StatusIntegracao @default(DESCONECTADA)
-  statusDetalhe       String?          @map("status_detalhe")
-  verificadoEm        DateTime?        @map("verificado_em")
-  criadoEm            DateTime         @default(now()) @map("criado_em")
-  atualizadoEm        DateTime         @updatedAt @map("atualizado_em")
+/// Uma instância de canal de WhatsApp. Pode haver VÁRIAS por provedor
+/// (vários números Evolution e/ou Meta); `ativo` marca a instância padrão
+/// global (exatamente uma true). As credenciais (apiKey/accessToken etc.)
+/// ficam num JSON cifrado em `credenciaisCifradas` (AES-256-GCM).
+model InstanciaCanal {
+  id                   String           @id @default(uuid()) @db.Uuid
+  provedor             ProvedorCanal
+  /// Apelido exibido nos cards e no seletor de envio (ex.: "SEMUS principal").
+  nome                 String
+  /// Identificador para casar o webhook de ENTRADA com a instância:
+  /// Evolution = nome da instância; Meta = phoneNumberId. Preenchido a partir
+  /// das credenciais ao salvar; null até o 1º salvar pós-migração (fallback).
+  identificadorExterno String?          @map("identificador_externo")
+  credenciaisCifradas  String?          @map("credenciais_cifradas")
+  ativo                Boolean          @default(false)
+  status               StatusIntegracao @default(DESCONECTADA)
+  statusDetalhe        String?          @map("status_detalhe")
+  verificadoEm         DateTime?        @map("verificado_em")
+  criadoEm             DateTime         @default(now()) @map("criado_em")
+  atualizadoEm         DateTime         @updatedAt @map("atualizado_em")
 
+  conversas Conversa[]
+
+  @@unique([provedor, identificadorExterno])
+  @@index([provedor])
   @@map("integracoes_canal")
 }
 
@@ -626,6 +650,7 @@ model FluxoVersao {
 model FluxoNo {
   id            String      @id @default(uuid()) @db.Uuid
   fluxoVersaoId String      @map("fluxo_versao_id") @db.Uuid
+  canal         CanalFluxo  @default(WEB_APP)
   chave         String
   tipo          TipoNoFluxo
   conteudo      Json        @default("{}")
@@ -639,19 +664,20 @@ model FluxoNo {
   arestasOrigem  FluxoAresta[] @relation("ArestaOrigem")
   arestasDestino FluxoAresta[] @relation("ArestaDestino")
 
-  @@unique([fluxoVersaoId, chave])
+  @@unique([fluxoVersaoId, canal, chave])
   @@index([fluxoVersaoId])
   @@map("fluxos_no")
 }
 
 /// Transição entre nós; `condicao` decide quando a aresta é seguida.
 model FluxoAresta {
-  id            String   @id @default(uuid()) @db.Uuid
-  fluxoVersaoId String   @map("fluxo_versao_id") @db.Uuid
-  noOrigemId    String   @map("no_origem_id") @db.Uuid
-  noDestinoId   String   @map("no_destino_id") @db.Uuid
-  condicao      Json     @default("{}")
-  ordem         Int      @default(0)
+  id            String     @id @default(uuid()) @db.Uuid
+  fluxoVersaoId String     @map("fluxo_versao_id") @db.Uuid
+  canal         CanalFluxo @default(WEB_APP)
+  noOrigemId    String     @map("no_origem_id") @db.Uuid
+  noDestinoId   String     @map("no_destino_id") @db.Uuid
+  condicao      Json       @default("{}")
+  ordem         Int        @default(0)
   criadoEm      DateTime @default(now()) @map("criado_em")
   atualizadoEm  DateTime @updatedAt @map("atualizado_em")
 

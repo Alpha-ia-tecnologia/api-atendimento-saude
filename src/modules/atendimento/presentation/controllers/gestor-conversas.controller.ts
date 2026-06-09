@@ -64,7 +64,7 @@ export class GestorConversasController {
     @CrmUser() user: AuthenticatedCrm,
     @Body() dto: ResponderConversaDto,
   ): Promise<ConversaDetalheDto> {
-    return this.responder.execute(id, user.usuarioCrmId, dto.conteudo);
+    return this.responder.execute(id, user.usuarioCrmId, dto.conteudo, dto.instanciaId);
   }
 
   @Post(':id/encerrar')

@@ -1,5 +1,5 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
-import { ProvedorCanal } from '@prisma/client';
+import { InstanciaCanal, ProvedorCanal } from '@prisma/client';
 
 import { PrismaService } from '../../../../shared/database/prisma/prisma.service';
 import { CryptoService } from '../../../../shared/crypto/crypto.service';
@@ -18,9 +18,10 @@ import { EvolutionAdapter } from '../../infrastructure/adapters/evolution.adapte
 import { MetaCloudAdapter } from '../../infrastructure/adapters/meta-cloud.adapter';
 
 /**
- * Implementação do `MessagingPort`: resolve o provedor ATIVO (e suas
- * credenciais cifradas) na `IntegracaoCanal` A CADA chamada — o ADMIN pode
- * trocar Evolution ↔ Meta pela tela de Integrações sem redeploy.
+ * Implementação do `MessagingPort`. Há VÁRIAS instâncias por provedor na
+ * `InstanciaCanal`: o envio usa a instância informada (ou a padrão `ativo`),
+ * e o webhook de entrada resolve a instância de origem pelo identificador do
+ * payload (instance name na Evolution, phoneNumberId na Meta).
  */
 @Injectable()
 export class MessagingService implements MessagingPort {
@@ -35,64 +36,125 @@ export class MessagingService implements MessagingPort {
 
   async disponivel(): Promise<boolean> {
     try {
-      await this.provedorAtivo();
+      await this.resolverEnvio(null);
       return true;
     } catch {
       return false;
     }
   }
 
-  async enviarTexto(msg: MensagemSaidaWhatsapp): Promise<ResultadoEnvio> {
-    const ativo = await this.provedorAtivo();
-    return ativo.provedor === ProvedorCanal.EVOLUTION
-      ? this.evolution.enviarTexto(ativo.cred as EvolutionCredenciais, msg)
-      : this.meta.enviarTexto(ativo.cred as MetaCredenciais, msg);
+  async enviarTexto(
+    msg: MensagemSaidaWhatsapp,
+    instanciaId?: string | null,
+  ): Promise<ResultadoEnvio> {
+    const { provedor, cred } = await this.resolverEnvio(instanciaId ?? null);
+    return provedor === ProvedorCanal.EVOLUTION
+      ? this.evolution.enviarTexto(cred as EvolutionCredenciais, msg)
+      : this.meta.enviarTexto(cred as MetaCredenciais, msg);
   }
 
-  /** Detecta o provedor pela FORMA do payload (os dois usam a mesma rota). */
+  /**
+   * Detecta o provedor pela FORMA do payload (os dois usam a mesma rota) e
+   * resolve a instância de origem pelo identificador, anexando-a às mensagens.
+   */
   async normalizarWebhook(payload: unknown): Promise<MensagemEntrante[]> {
     const ehMeta = (payload as { object?: string })?.object === 'whatsapp_business_account';
+
     if (ehMeta) {
-      return this.meta.normalizarWebhook(
-        await this.credenciais<MetaCredenciais>(ProvedorCanal.META),
-        payload,
-      );
+      const phoneNumberId = this.phoneNumberIdDoPayload(payload);
+      const instancia = await this.instanciaPorIdentificador(ProvedorCanal.META, phoneNumberId);
+      const cred = instancia
+        ? lerCredenciais<MetaCredenciais>(this.crypto, instancia.credenciaisCifradas).cred
+        : null;
+      const mensagens = await this.meta.normalizarWebhook(cred, payload);
+      return mensagens.map((m) => ({ ...m, instanciaCanalId: instancia?.id ?? null }));
     }
-    return this.evolution.normalizarWebhook(payload);
+
+    const instanceName = (payload as { instance?: string })?.instance ?? null;
+    const instancia = await this.instanciaPorIdentificador(ProvedorCanal.EVOLUTION, instanceName);
+    const mensagens = await this.evolution.normalizarWebhook(payload);
+    return mensagens.map((m) => ({ ...m, instanciaCanalId: instancia?.id ?? null }));
   }
 
+  /** Aceita o verify_token de QUALQUER instância Meta configurada. */
   async verificarTokenMeta(token: string): Promise<boolean> {
-    const cred = await this.credenciais<MetaCredenciais>(ProvedorCanal.META);
-    return !!cred?.verifyToken && cred.verifyToken === token;
+    if (!token) return false;
+    const metas = await this.prisma.instanciaCanal.findMany({
+      where: { provedor: ProvedorCanal.META },
+    });
+    return metas.some((row) => {
+      const cred = lerCredenciais<MetaCredenciais>(this.crypto, row.credenciaisCifradas).cred;
+      return !!cred?.verifyToken && cred.verifyToken === token;
+    });
   }
 
   // ---------------------------------------------------------------- privados
 
-  private async provedorAtivo(): Promise<{
+  /** Resolve (instância + credenciais) para envio: por id, ou a padrão. */
+  private async resolverEnvio(instanciaId: string | null): Promise<{
     provedor: ProvedorCanal;
     cred: EvolutionCredenciais | MetaCredenciais;
   }> {
-    const row = await this.prisma.integracaoCanal.findFirst({ where: { ativo: true } });
+    const row = instanciaId
+      ? await this.prisma.instanciaCanal.findUnique({ where: { id: instanciaId } })
+      : await this.prisma.instanciaCanal.findFirst({ where: { ativo: true } });
+
     if (!row) {
       throw new ServiceUnavailableException(
-        'Nenhum provedor de WhatsApp ativo — configure na tela de Integrações.',
+        instanciaId
+          ? 'Instância de WhatsApp não encontrada.'
+          : 'Nenhuma instância de WhatsApp padrão — configure na tela de Integrações.',
       );
     }
+
     const { cred, ilegivel } = lerCredenciais<EvolutionCredenciais | MetaCredenciais>(
       this.crypto,
       row.credenciaisCifradas,
     );
     if (!cred) {
       this.logger.error(
-        `Credenciais do provedor ${row.provedor} ${ilegivel ? 'ilegíveis (ENCRYPTION_KEY trocada?)' : 'ausentes'}.`,
+        `Credenciais da instância ${row.nome} (${row.provedor}) ${ilegivel ? 'ilegíveis (ENCRYPTION_KEY trocada?)' : 'ausentes'}.`,
       );
-      throw new ServiceUnavailableException('Credenciais do provedor de WhatsApp indisponíveis.');
+      throw new ServiceUnavailableException('Credenciais da instância de WhatsApp indisponíveis.');
     }
     return { provedor: row.provedor, cred };
   }
 
-  private async credenciais<T>(provedor: ProvedorCanal): Promise<T | null> {
-    const row = await this.prisma.integracaoCanal.findUnique({ where: { provedor } });
-    return lerCredenciais<T>(this.crypto, row?.credenciaisCifradas ?? null).cred;
+  /**
+   * Casa o webhook de entrada com a instância pelo identificador. Sem casar
+   * (identificador null/desconhecido — ex.: instância ainda não resincronizada
+   * pós-migração), cai na padrão do provedor para não perder a mensagem.
+   */
+  private async instanciaPorIdentificador(
+    provedor: ProvedorCanal,
+    identificador: string | null,
+  ): Promise<InstanciaCanal | null> {
+    if (identificador) {
+      const exata = await this.prisma.instanciaCanal.findFirst({
+        where: { provedor, identificadorExterno: identificador },
+      });
+      if (exata) return exata;
+      this.logger.warn(
+        `Webhook ${provedor} sem instância para "${identificador}" — usando a padrão do provedor.`,
+      );
+    }
+    return this.prisma.instanciaCanal.findFirst({
+      where: { provedor },
+      orderBy: [{ ativo: 'desc' }, { criadoEm: 'asc' }],
+    });
+  }
+
+  /** Extrai o phoneNumberId do 1º entry/change do payload da Meta. */
+  private phoneNumberIdDoPayload(payload: unknown): string | null {
+    const corpo = payload as {
+      entry?: { changes?: { value?: { metadata?: { phone_number_id?: string } } }[] }[];
+    };
+    for (const entry of corpo?.entry ?? []) {
+      for (const change of entry.changes ?? []) {
+        const id = change.value?.metadata?.phone_number_id;
+        if (id) return id;
+      }
+    }
+    return null;
   }
 }

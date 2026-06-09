@@ -47,10 +47,10 @@ export class SalvarRascunhoUseCase {
     }
 
     await this.prisma.$transaction(async (tx) => {
-      // Replace total: apaga e recria (cascade cobre arestas via nós, mas
-      // apagamos explicitamente na ordem certa).
-      await tx.fluxoAresta.deleteMany({ where: { fluxoVersaoId: versao.id } });
-      await tx.fluxoNo.deleteMany({ where: { fluxoVersaoId: versao.id } });
+      // Replace ESCOPADO ao canal: cada canal (Web/App e WhatsApp) é um grafo
+      // próprio; salvar um canal não toca no outro. Variáveis são da versão.
+      await tx.fluxoAresta.deleteMany({ where: { fluxoVersaoId: versao.id, canal: dto.canal } });
+      await tx.fluxoNo.deleteMany({ where: { fluxoVersaoId: versao.id, canal: dto.canal } });
       await tx.fluxoVariavel.deleteMany({ where: { fluxoVersaoId: versao.id } });
 
       const idPorChave = new Map<string, string>();
@@ -58,6 +58,7 @@ export class SalvarRascunhoUseCase {
         const criado = await tx.fluxoNo.create({
           data: {
             fluxoVersaoId: versao.id,
+            canal: dto.canal,
             chave: n.chave,
             tipo: n.tipo,
             conteudo: n.conteudo as Prisma.InputJsonValue,
@@ -73,6 +74,7 @@ export class SalvarRascunhoUseCase {
         await tx.fluxoAresta.create({
           data: {
             fluxoVersaoId: versao.id,
+            canal: dto.canal,
             noOrigemId: idPorChave.get(a.origemChave)!,
             noDestinoId: idPorChave.get(a.destinoChave)!,
             condicao: a.condicao as Prisma.InputJsonValue,

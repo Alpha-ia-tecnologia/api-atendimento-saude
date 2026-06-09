@@ -18,6 +18,7 @@ export class ObterConversaGestorUseCase {
       include: {
         usuarioMaria: { select: { nome: true, cpf: true, fotoPerfilUrl: true } },
         solicitacao: { select: { protocolo: true } },
+        instanciaCanal: { select: { id: true, nome: true } },
         mensagens: { orderBy: { criadoEm: 'asc' } },
       },
     });

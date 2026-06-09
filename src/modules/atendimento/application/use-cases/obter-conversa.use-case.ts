@@ -28,7 +28,7 @@ export class ObterConversaUseCase {
     const finalizada = conversa.estado === EstadoConversa.ENCERRADA;
     const fluxo = finalizada
       ? null
-      : await this.resolver.resolverParaConversa(conversa.fluxoVersaoId);
+      : await this.resolver.resolverParaConversa(conversa.fluxoVersaoId, conversa.canal);
     const proximaAcao = finalizada
       ? ({ tipo: 'nenhum' } as const)
       : await this.engine.acaoAtual(

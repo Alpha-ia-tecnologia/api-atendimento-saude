@@ -105,6 +105,17 @@ export interface NoAcaoCriarSolicitacao extends NoBase {
   proximo: string;
 }
 
+/**
+ * Redireciona para outro nó por REFERÊNCIA (a chave de destino mora no nó, não
+ * numa aresta). Não pede entrada nem emite mensagem — o motor encaminha direto
+ * pro `alvo`. Serve pra evitar setas longas cruzando o canvas (loops/reuso).
+ */
+export interface NoRedirecionar extends NoBase {
+  tipo: 'REDIRECIONAR';
+  /** Chave do nó de destino. */
+  alvo: string;
+}
+
 /** Encerra a conversa. Pode oferecer opções finais (ex.: nova solicitação). */
 export interface NoFim extends NoBase {
   tipo: 'FIM';
@@ -120,6 +131,7 @@ export type No =
   | NoPerguntaTexto
   | NoUpload
   | NoAcaoCriarSolicitacao
+  | NoRedirecionar
   | NoFim;
 
 export interface Fluxo {

@@ -1,10 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ProvedorCanal } from '@prisma/client';
 
 import { PrismaService } from '../../../../shared/database/prisma/prisma.service';
 import { CryptoService } from '../../../../shared/crypto/crypto.service';
-import { lerCredenciais, montarProvedorEstado } from '../integracao.mapper';
+import { lerCredenciais, montarInstanciaEstado } from '../integracao.mapper';
 import { EvolutionCredenciais, IntegracoesEstado, MetaCredenciais } from '../integracao.types';
 import { montarWebhookUrl } from '../webhook-url.helper';
 
@@ -17,30 +16,25 @@ export class ObterIntegracoesUseCase {
   ) {}
 
   async execute(): Promise<IntegracoesEstado> {
-    const linhas = await this.prisma.integracaoCanal.findMany();
-    const evolutionRow = linhas.find((l) => l.provedor === ProvedorCanal.EVOLUTION);
-    const metaRow = linhas.find((l) => l.provedor === ProvedorCanal.META);
-
-    const evolution = lerCredenciais<EvolutionCredenciais>(
-      this.crypto,
-      evolutionRow?.credenciaisCifradas ?? null,
-    );
-    const meta = lerCredenciais<MetaCredenciais>(this.crypto, metaRow?.credenciaisCifradas ?? null);
+    const linhas = await this.prisma.instanciaCanal.findMany({
+      orderBy: [{ provedor: 'asc' }, { criadoEm: 'asc' }],
+    });
 
     const webhookUrl =
       montarWebhookUrl(this.config.get<string>('PUBLIC_BASE_URL')) ?? '/webhooks/whatsapp';
 
+    const instancias = linhas.map((row) => {
+      const { cred, ilegivel } = lerCredenciais<EvolutionCredenciais | MetaCredenciais>(
+        this.crypto,
+        row.credenciaisCifradas,
+      );
+      return montarInstanciaEstado(row, cred, ilegivel);
+    });
+
     return {
       chaveConfigurada: this.crypto.disponivel(),
       webhookUrl,
-      verifyToken: meta.cred?.verifyToken ?? null,
-      evolution: montarProvedorEstado(
-        ProvedorCanal.EVOLUTION,
-        evolutionRow,
-        evolution.cred,
-        evolution.ilegivel,
-      ),
-      meta: montarProvedorEstado(ProvedorCanal.META, metaRow, meta.cred, meta.ilegivel),
+      instancias,
     };
   }
 }

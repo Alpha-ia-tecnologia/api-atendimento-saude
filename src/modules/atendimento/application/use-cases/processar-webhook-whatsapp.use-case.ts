@@ -69,11 +69,15 @@ export class ProcessarWebhookWhatsappUseCase {
   // ---------------------------------------------------------------- privados
 
   private async processarMensagem(msg: MensagemEntrante): Promise<void> {
-    // Idempotência: reentrega do provedor com idExterno já visto é ignorada.
+    // Idempotência: reentrega com idExterno já visto é ignorada. O idExterno
+    // só é único POR PROVEDOR — incluímos o provedor pra não colidir entre eles.
     const jaProcessada = await this.prisma.mensagem.findFirst({
       where: {
         direcao: DirecaoMensagem.ENTRADA,
-        metadados: { path: ['idExterno'], equals: msg.idExterno },
+        AND: [
+          { metadados: { path: ['idExterno'], equals: msg.idExterno } },
+          { metadados: { path: ['provedor'], equals: msg.provedor } },
+        ],
       },
       select: { id: true },
     });
@@ -112,7 +116,10 @@ export class ProcessarWebhookWhatsappUseCase {
       : {};
 
     const versao = await this.resolver.versaoPublicadaDoAtendimento();
-    const fluxo = await this.resolver.resolverParaConversa(versao?.id ?? null);
+    const fluxo = await this.resolver.resolverParaConversa(
+      versao?.id ?? null,
+      CanalConversa.WHATSAPP,
+    );
 
     const passo = await this.engine.processar(
       {
@@ -131,6 +138,8 @@ export class ProcessarWebhookWhatsappUseCase {
         canal: CanalConversa.WHATSAPP,
         usuarioMariaId: usuario?.id ?? null,
         contatoExterno: msg.contato,
+        // Fixa a instância que recebeu: respostas saem por ela por padrão.
+        instanciaCanalId: msg.instanciaCanalId ?? null,
         fluxoChave: FLUXO_ATENDIMENTO_V1,
         fluxoVersaoId: versao?.id ?? null,
         noAtual: passo.noAtual,
@@ -142,12 +151,15 @@ export class ProcessarWebhookWhatsappUseCase {
       select: { id: true },
     });
 
-    await this.entregarPasso(conversa.id, msg.contato, passo);
+    await this.entregarPasso(conversa.id, msg.contato, passo, msg.instanciaCanalId ?? null);
   }
 
   /** Mensagem numa conversa ativa: consome a entrada e avança o fluxo. */
   private async continuarConversa(conversa: Conversa, msg: MensagemEntrante): Promise<void> {
-    const fluxo = await this.resolver.resolverParaConversa(conversa.fluxoVersaoId);
+    const fluxo = await this.resolver.resolverParaConversa(
+      conversa.fluxoVersaoId,
+      CanalConversa.WHATSAPP,
+    );
     const variaveis = (conversa.variaveis ?? {}) as Variaveis;
     const acao = await this.mapearAcao(conversa.noAtual, variaveis, msg, fluxo);
 
@@ -182,6 +194,7 @@ export class ProcessarWebhookWhatsappUseCase {
         msg.contato,
         '😥 Não consegui concluir sua solicitação. Manda outra mensagem pra gente recomeçar do início, por favor.',
         null,
+        conversa.instanciaCanalId,
       );
       return;
     }
@@ -207,7 +220,7 @@ export class ProcessarWebhookWhatsappUseCase {
       }),
     ]);
 
-    await this.entregarPasso(conversa.id, msg.contato, passo);
+    await this.entregarPasso(conversa.id, msg.contato, passo, conversa.instanciaCanalId);
   }
 
   /**
@@ -248,14 +261,15 @@ export class ProcessarWebhookWhatsappUseCase {
     return porTexto?.id ?? null;
   }
 
-  /** Envia as falas do passo pelo provedor e registra cada uma como Mensagem. */
+  /** Envia as falas do passo pela instância da conversa e registra cada uma. */
   private async entregarPasso(
     conversaId: string,
     contato: string,
     passo: ResultadoPasso,
+    instanciaCanalId: string | null,
   ): Promise<void> {
     for (const texto of this.renderizarPasso(passo)) {
-      await this.enviarESalvar(conversaId, contato, texto, passo.noAtual);
+      await this.enviarESalvar(conversaId, contato, texto, passo.noAtual, instanciaCanalId);
     }
   }
 
@@ -288,10 +302,11 @@ export class ProcessarWebhookWhatsappUseCase {
     contato: string,
     texto: string,
     noFluxo: string | null,
+    instanciaCanalId: string | null,
   ): Promise<void> {
     let metadados: Record<string, unknown>;
     try {
-      const { idExterno } = await this.messaging.enviarTexto({ contato, texto });
+      const { idExterno } = await this.messaging.enviarTexto({ contato, texto }, instanciaCanalId);
       metadados = { idExterno };
     } catch (err) {
       this.logger.error(`Envio ao WhatsApp falhou: ${(err as Error).message}`);

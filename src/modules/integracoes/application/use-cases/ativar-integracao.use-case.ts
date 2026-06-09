@@ -1,13 +1,12 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ProvedorCanal } from '@prisma/client';
 
 import { AUDIT_EVENT } from '../../../audit/application/events/audit.event';
 import { PrismaService } from '../../../../shared/database/prisma/prisma.service';
 
 /**
- * Define o provedor ativo: marca `ativo=true` no escolhido e `false` nos
- * demais (transação). Só permite ativar um provedor já configurado.
+ * Define a instância PADRÃO global: marca `ativo=true` na escolhida e `false`
+ * em todas as outras (transação). Só permite uma instância já configurada.
  */
 @Injectable()
 export class AtivarIntegracaoUseCase {
@@ -16,21 +15,22 @@ export class AtivarIntegracaoUseCase {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  async execute(provedor: ProvedorCanal, operadorId?: string): Promise<void> {
-    const alvo = await this.prisma.integracaoCanal.findUnique({
-      where: { provedor },
-    });
-    if (!alvo?.credenciaisCifradas) {
-      throw new BadRequestException('Configure as credenciais deste provedor antes de ativá-lo.');
+  async execute(instanciaId: string, operadorId?: string): Promise<void> {
+    const alvo = await this.prisma.instanciaCanal.findUnique({ where: { id: instanciaId } });
+    if (!alvo) {
+      throw new NotFoundException('Instância não encontrada.');
+    }
+    if (!alvo.credenciaisCifradas) {
+      throw new BadRequestException('Configure as credenciais desta instância antes de ativá-la.');
     }
 
     await this.prisma.$transaction([
-      this.prisma.integracaoCanal.updateMany({
-        where: { provedor: { not: provedor } },
+      this.prisma.instanciaCanal.updateMany({
+        where: { id: { not: instanciaId } },
         data: { ativo: false },
       }),
-      this.prisma.integracaoCanal.update({
-        where: { provedor },
+      this.prisma.instanciaCanal.update({
+        where: { id: instanciaId },
         data: { ativo: true },
       }),
     ]);
@@ -39,7 +39,7 @@ export class AtivarIntegracaoUseCase {
       userId: operadorId ?? null,
       action: 'INTEGRACAO_ATIVADA',
       resource: 'integracao_canal',
-      resourceId: provedor,
+      resourceId: instanciaId,
     });
   }
 }

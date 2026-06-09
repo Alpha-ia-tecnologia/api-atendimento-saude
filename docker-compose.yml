@@ -11,32 +11,6 @@ services:
     networks:
       - atendimento_saude_net
 
-  # Postgres local opcional - habilite com `docker compose --profile local-db up`
-  # se quiser rodar contra um banco local em vez do remoto definido em DATABASE_URL.
-  postgres:
-    image: postgres:16-alpine
-    container_name: atendimento_saude_postgres
-    restart: unless-stopped
-    profiles: ['local-db']
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-atendimento_db}
-    ports:
-      - '5432:5432'
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres}']
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    networks:
-      - atendimento_saude_net
-
-volumes:
-  postgres_data:
-
 networks:
   atendimento_saude_net:
     driver: bridge

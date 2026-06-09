@@ -6,7 +6,14 @@
  * É o equivalente, em dados, às funções de texto do fluxo hardcoded — usado
  * pelo simulador (e, futuramente, pelo motor ao executar do banco).
  */
+import { CanalConversa, CanalFluxo } from '@prisma/client';
+
 export type Variaveis = Record<string, unknown>;
+
+/** Mapeia o canal da conversa para o grafo de canal do fluxo (Web e App → WEB_APP). */
+export function grupoDoCanal(canal: CanalConversa): CanalFluxo {
+  return canal === CanalConversa.WHATSAPP ? CanalFluxo.WHATSAPP : CanalFluxo.WEB_APP;
+}
 
 function primeiroNome(v: Variaveis): string {
   const nome =

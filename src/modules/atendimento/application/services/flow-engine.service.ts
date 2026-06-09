@@ -266,6 +266,12 @@ export class FlowEngineService {
           continue;
         }
 
+        case 'REDIRECIONAR':
+          // Encaminha pro nó referenciado (sem aresta). O limite de passos
+          // acima protege contra redirecionamentos em ciclo.
+          noId = no.alvo;
+          continue;
+
         case 'ESCOLHA':
           mensagens.push(...this.resolverTextos(no.textos ?? [], variaveis));
           return this.parar(

@@ -1,4 +1,4 @@
-import { StatusFluxoVersao, TipoNoFluxo } from '@prisma/client';
+import { CanalFluxo, StatusFluxoVersao, TipoNoFluxo } from '@prisma/client';
 
 import { FluxoResolverService } from './fluxo-resolver.service';
 import { fluxoAtendimentoV1 } from '../flows/atendimento-v1.flow';
@@ -17,16 +17,32 @@ function buildPrisma() {
 const VERSAO_BANCO = {
   id: 'versao-1',
   nos: [
-    { id: 'no-a', chave: 'inicio', tipo: TipoNoFluxo.INICIO, conteudo: {}, ehInicial: true },
+    {
+      id: 'no-a',
+      canal: CanalFluxo.WEB_APP,
+      chave: 'inicio',
+      tipo: TipoNoFluxo.INICIO,
+      conteudo: {},
+      ehInicial: true,
+    },
     {
       id: 'no-b',
+      canal: CanalFluxo.WEB_APP,
       chave: 'fim',
       tipo: TipoNoFluxo.FIM,
       conteudo: { textos: ['Tchau!'] },
       ehInicial: false,
     },
   ],
-  arestas: [{ noOrigemId: 'no-a', noDestinoId: 'no-b', condicao: { tipo: 'sempre' }, ordem: 1 }],
+  arestas: [
+    {
+      canal: CanalFluxo.WEB_APP,
+      noOrigemId: 'no-a',
+      noDestinoId: 'no-b',
+      condicao: { tipo: 'sempre' },
+      ordem: 1,
+    },
+  ],
 };
 
 describe('FluxoResolverService', () => {

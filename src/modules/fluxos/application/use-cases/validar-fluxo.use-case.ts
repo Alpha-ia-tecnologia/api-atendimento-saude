@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { TipoNoFluxo } from '@prisma/client';
+import { CanalFluxo, TipoNoFluxo } from '@prisma/client';
 
 import { ResultadoValidacaoFluxo } from '../fluxo.types';
 
@@ -8,14 +8,23 @@ interface NoValidacao {
   tipo: TipoNoFluxo;
   ehInicial: boolean;
   conteudo: Record<string, unknown>;
+  canal: CanalFluxo;
 }
 interface ArestaValidacao {
   origemChave: string;
   destinoChave: string;
+  canal: CanalFluxo;
 }
 
+const ROTULO_CANAL: Record<CanalFluxo, string> = {
+  WEB_APP: 'Web/App',
+  WHATSAPP: 'WhatsApp',
+};
+
 /**
- * Valida a consistência de um fluxo antes de publicar:
+ * Valida a consistência de um fluxo antes de publicar. Cada canal (Web/App e
+ * WhatsApp) é um grafo independente e é validado separadamente; só entram na
+ * validação os canais que têm nós. Por grafo:
  * - exatamente um nó inicial;
  * - nenhum nó órfão (todos alcançáveis a partir do inicial);
  * - todo nó alcança um FIM;
@@ -25,16 +34,35 @@ interface ArestaValidacao {
 @Injectable()
 export class ValidarFluxoUseCase {
   execute(
+    nosTodos: NoValidacao[],
+    arestasTodas: ArestaValidacao[],
+    variaveisDeclaradas: string[],
+  ): ResultadoValidacaoFluxo {
+    if (nosTodos.length === 0) {
+      return { valido: false, problemas: ['O fluxo não tem nenhum nó.'] };
+    }
+    const canais = [...new Set(nosTodos.map((n) => n.canal))];
+    const problemas: string[] = [];
+    for (const canal of canais) {
+      const nos = nosTodos.filter((n) => n.canal === canal);
+      const arestas = arestasTodas.filter((a) => a.canal === canal);
+      problemas.push(
+        ...this.validarGrafo(nos, arestas, variaveisDeclaradas).map(
+          (p) => `[${ROTULO_CANAL[canal]}] ${p}`,
+        ),
+      );
+    }
+    return { valido: problemas.length === 0, problemas };
+  }
+
+  /** Valida UM subgrafo (um canal). Devolve a lista de problemas (sem prefixo). */
+  private validarGrafo(
     nos: NoValidacao[],
     arestas: ArestaValidacao[],
     variaveisDeclaradas: string[],
-  ): ResultadoValidacaoFluxo {
+  ): string[] {
     const problemas: string[] = [];
     const chaves = new Set(nos.map((n) => n.chave));
-
-    if (nos.length === 0) {
-      return { valido: false, problemas: ['O fluxo não tem nenhum nó.'] };
-    }
 
     // 1) Exatamente um nó inicial (bloco INICIO ou nó marcado como inicial).
     const iniciais = nos.filter((n) => n.tipo === TipoNoFluxo.INICIO || n.ehInicial);
@@ -67,6 +95,21 @@ export class ValidarFluxoUseCase {
       if (!chaves.has(a.origemChave) || !chaves.has(a.destinoChave)) continue;
       ligar(adj, a.origemChave, a.destinoChave);
       ligar(adjRev, a.destinoChave, a.origemChave);
+    }
+
+    // Nós REDIRECIONAR encaminham pro `conteudo.alvo` por referência (sem
+    // aresta) — viram arestas virtuais p/ alcançabilidade e "alcança FIM".
+    for (const n of nos) {
+      if (n.tipo !== TipoNoFluxo.REDIRECIONAR) continue;
+      const alvo = typeof n.conteudo?.alvo === 'string' ? n.conteudo.alvo : '';
+      if (!alvo || !chaves.has(alvo)) {
+        problemas.push(
+          `Nó de redirecionamento "${n.chave}" aponta para um destino inexistente${alvo ? ` ("${alvo}")` : ''}.`,
+        );
+        continue;
+      }
+      ligar(adj, n.chave, alvo);
+      ligar(adjRev, alvo, n.chave);
     }
 
     // 3) Nós órfãos (inalcançáveis a partir do inicial).
@@ -112,7 +155,7 @@ export class ValidarFluxoUseCase {
       }
     }
 
-    return { valido: problemas.length === 0, problemas };
+    return problemas;
   }
 }
 

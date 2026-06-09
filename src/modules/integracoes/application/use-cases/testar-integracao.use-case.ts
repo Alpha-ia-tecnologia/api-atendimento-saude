@@ -1,5 +1,4 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { ProvedorCanal } from '@prisma/client';
 
 import { PrismaService } from '../../../../shared/database/prisma/prisma.service';
 import { CryptoService } from '../../../../shared/crypto/crypto.service';
@@ -19,17 +18,17 @@ export class TestarIntegracaoUseCase {
     private readonly tester: WhatsappTesterService,
   ) {}
 
-  async execute(provedor: ProvedorCanal): Promise<ResultadoTeste & { verificadoEm: string }> {
+  async execute(instanciaId: string): Promise<ResultadoTeste & { verificadoEm: string }> {
     if (!this.crypto.disponivel()) {
       throw new BadRequestException(
         'ENCRYPTION_KEY não configurada no servidor — não é possível ler as credenciais.',
       );
     }
-    const row = await this.prisma.integracaoCanal.findUnique({
-      where: { provedor },
+    const row = await this.prisma.instanciaCanal.findUnique({
+      where: { id: instanciaId },
     });
     if (!row?.credenciaisCifradas) {
-      throw new NotFoundException('Provedor ainda não configurado.');
+      throw new NotFoundException('Instância ainda não configurada.');
     }
 
     const { cred, ilegivel } = lerCredenciais<EvolutionCredenciais | MetaCredenciais>(
@@ -38,14 +37,14 @@ export class TestarIntegracaoUseCase {
     );
     if (ilegivel || !cred) {
       throw new BadRequestException(
-        'Não foi possível decifrar as credenciais com a chave atual. Reconfigure o provedor.',
+        'Não foi possível decifrar as credenciais com a chave atual. Reconfigure a instância.',
       );
     }
-    const resultado = await this.tester.testar(provedor, cred);
+    const resultado = await this.tester.testar(row.provedor, cred);
 
     const verificadoEm = new Date();
-    await this.prisma.integracaoCanal.update({
-      where: { provedor },
+    await this.prisma.instanciaCanal.update({
+      where: { id: instanciaId },
       data: {
         status: resultado.status,
         statusDetalhe: resultado.detalhe,

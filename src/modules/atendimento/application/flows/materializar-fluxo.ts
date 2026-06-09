@@ -1,4 +1,4 @@
-import { TipoNoFluxo } from '@prisma/client';
+import { CanalFluxo, TipoNoFluxo } from '@prisma/client';
 
 import { interpolar } from '../../../fluxos/application/fluxo-interpolacao';
 import { CampoTexto, Fluxo, No, OpcaoFluxo, Texto, Variaveis } from './tipos';
@@ -18,6 +18,7 @@ import { CampoTexto, Fluxo, No, OpcaoFluxo, Texto, Variaveis } from './tipos';
  */
 export interface NoBanco {
   id: string;
+  canal: CanalFluxo;
   chave: string;
   tipo: TipoNoFluxo;
   conteudo: unknown;
@@ -25,6 +26,7 @@ export interface NoBanco {
 }
 
 export interface ArestaBanco {
+  canal: CanalFluxo;
   noOrigemId: string;
   noDestinoId: string;
   condicao: unknown;
@@ -36,7 +38,22 @@ interface Saida {
   condicao: Record<string, unknown>;
 }
 
-export function materializarFluxo(chave: string, nos: NoBanco[], arestas: ArestaBanco[]): Fluxo {
+/**
+ * Materializa o subgrafo do `grupo` (canal). Se o grupo não tem nós (ex.: o
+ * WhatsApp ainda não foi customizado), cai no grafo `WEB_APP` — assim só se
+ * constrói o segundo fluxo quando se quer diferença.
+ */
+export function materializarFluxo(
+  chave: string,
+  nosTodos: NoBanco[],
+  arestasTodas: ArestaBanco[],
+  grupo: CanalFluxo = CanalFluxo.WEB_APP,
+): Fluxo {
+  const temNoCanal = nosTodos.some((n) => n.canal === grupo);
+  const canalEfetivo = temNoCanal ? grupo : CanalFluxo.WEB_APP;
+  const nos = nosTodos.filter((n) => n.canal === canalEfetivo);
+  const arestas = arestasTodas.filter((a) => a.canal === canalEfetivo);
+
   const idParaChave = new Map<string, string>();
   for (const n of nos) idParaChave.set(n.id, n.chave);
 
@@ -164,6 +181,15 @@ export function materializarFluxo(chave: string, nos: NoBanco[], arestas: Aresta
           id: n.chave,
           tipo: 'ACAO_CRIAR_SOLICITACAO',
           proximo: destinoSempre(n.chave),
+        };
+        break;
+
+      case TipoNoFluxo.REDIRECIONAR:
+        // O destino vem do `conteudo.alvo` (referência), não de uma aresta.
+        nosFluxo[n.chave] = {
+          id: n.chave,
+          tipo: 'REDIRECIONAR',
+          alvo: String(conteudo.alvo ?? ''),
         };
         break;
 

@@ -42,10 +42,12 @@ export class PublicarVersaoUseCase {
         tipo: n.tipo,
         ehInicial: n.ehInicial,
         conteudo: (n.conteudo ?? {}) as Record<string, unknown>,
+        canal: n.canal,
       })),
       versao.arestas.map((a) => ({
         origemChave: chavePorId.get(a.noOrigemId) ?? '',
         destinoChave: chavePorId.get(a.noDestinoId) ?? '',
+        canal: a.canal,
       })),
       versao.variaveis.map((v) => v.chave),
     );

@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { StatusFluxoVersao } from '@prisma/client';
+import { CanalConversa, StatusFluxoVersao } from '@prisma/client';
 
 import { PrismaService } from '../../../../shared/database/prisma/prisma.service';
+import { grupoDoCanal } from '../../../fluxos/application/fluxo-interpolacao';
 import { fluxoAtendimentoV1 } from '../flows/atendimento-v1.flow';
 import { Fluxo } from '../flows/tipos';
 import { materializarFluxo } from '../flows/materializar-fluxo';
@@ -36,11 +37,19 @@ export class FluxoResolverService {
     return versao ?? null;
   }
 
-  /** Materializa (com cache) a versão fixada na conversa; fallback hardcoded. */
-  async resolverParaConversa(fluxoVersaoId: string | null): Promise<Fluxo> {
+  /**
+   * Materializa (com cache) o subgrafo do canal da conversa; fallback hardcoded.
+   * O cache é por `${versão}:${grupo}` (cada versão tem 2 grafos: Web/App e WhatsApp).
+   */
+  async resolverParaConversa(
+    fluxoVersaoId: string | null,
+    canal: CanalConversa = CanalConversa.WEB,
+  ): Promise<Fluxo> {
     if (!fluxoVersaoId) return fluxoAtendimentoV1;
 
-    const cacheado = this.cache.get(fluxoVersaoId);
+    const grupo = grupoDoCanal(canal);
+    const chaveCache = `${fluxoVersaoId}:${grupo}`;
+    const cacheado = this.cache.get(chaveCache);
     if (cacheado) return cacheado;
 
     const versao = await this.prisma.fluxoVersao.findUnique({
@@ -54,8 +63,8 @@ export class FluxoResolverService {
       return fluxoAtendimentoV1;
     }
 
-    const fluxo = materializarFluxo(fluxoVersaoId, versao.nos, versao.arestas);
-    this.cache.set(fluxoVersaoId, fluxo);
+    const fluxo = materializarFluxo(fluxoVersaoId, versao.nos, versao.arestas, grupo);
+    this.cache.set(chaveCache, fluxo);
     return fluxo;
   }
 }

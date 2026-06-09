@@ -11,6 +11,7 @@ import { TestarIntegracaoUseCase } from './application/use-cases/testar-integrac
 import { AtivarIntegracaoUseCase } from './application/use-cases/ativar-integracao.use-case';
 import { ConectarEvolutionUseCase } from './application/use-cases/conectar-evolution.use-case';
 import { EnviarTesteUseCase } from './application/use-cases/enviar-teste.use-case';
+import { ExcluirInstanciaUseCase } from './application/use-cases/excluir-instancia.use-case';
 import { StatusCanalUseCase } from './application/use-cases/status-canal.use-case';
 
 @Module({
@@ -25,6 +26,7 @@ import { StatusCanalUseCase } from './application/use-cases/status-canal.use-cas
     AtivarIntegracaoUseCase,
     ConectarEvolutionUseCase,
     EnviarTesteUseCase,
+    ExcluirInstanciaUseCase,
     StatusCanalUseCase,
   ],
 })

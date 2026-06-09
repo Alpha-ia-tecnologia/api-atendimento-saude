@@ -1,7 +1,26 @@
-import { IntegracaoCanal, ProvedorCanal } from '@prisma/client';
+import { InstanciaCanal, ProvedorCanal } from '@prisma/client';
 
 import { CryptoService } from '../../../shared/crypto/crypto.service';
-import { EvolutionCredenciais, MetaCredenciais, ProvedorEstado } from './integracao.types';
+import {
+  EvolutionCredenciais,
+  InstanciaCanalEstado,
+  MetaCredenciais,
+} from './integracao.types';
+
+/**
+ * Identificador para casar o webhook de entrada com a instância:
+ * Evolution = nome da instância; Meta = phoneNumberId. Null se ausente.
+ */
+export function extrairIdentificador(
+  provedor: ProvedorCanal,
+  cred: EvolutionCredenciais | MetaCredenciais,
+): string | null {
+  const valor =
+    provedor === ProvedorCanal.EVOLUTION
+      ? (cred as EvolutionCredenciais).instance
+      : (cred as MetaCredenciais).phoneNumberId;
+  return valor?.trim() || null;
+}
 
 /** Mostra só os últimos 4 caracteres de um segredo (ou null se ausente). */
 export function mascararSegredo(valor?: string | null): string | null {
@@ -36,14 +55,14 @@ export function lerCredenciais<T>(
   }
 }
 
-/** Monta o estado de um provedor para o CRM (segredos mascarados). */
-export function montarProvedorEstado(
-  provedor: ProvedorCanal,
-  row: IntegracaoCanal | undefined,
+/** Monta o estado de uma instância para o CRM (segredos mascarados). */
+export function montarInstanciaEstado(
+  row: InstanciaCanal,
   cred: EvolutionCredenciais | MetaCredenciais | null,
   ilegivel = false,
-): ProvedorEstado {
-  const temCifrado = !!row?.credenciaisCifradas;
+): InstanciaCanalEstado {
+  const provedor = row.provedor;
+  const temCifrado = !!row.credenciaisCifradas;
 
   const campos: Record<string, string | null> =
     provedor === ProvedorCanal.EVOLUTION
@@ -63,7 +82,7 @@ export function montarProvedorEstado(
       : (cred as MetaCredenciais | null)?.accessToken;
   const nomeSegredo = provedor === ProvedorCanal.EVOLUTION ? 'apiKey' : 'accessToken';
 
-  const segredos: ProvedorEstado['segredos'] = {
+  const segredos: InstanciaCanalEstado['segredos'] = {
     [nomeSegredo]: {
       definida: cred ? !!segredoValor : temCifrado,
       mascara: mascararSegredo(segredoValor),
@@ -71,13 +90,15 @@ export function montarProvedorEstado(
   };
 
   return {
+    id: row.id,
     provedor,
+    nome: row.nome,
     configurado: temCifrado,
     ilegivel,
-    ativo: row?.ativo ?? false,
-    status: row?.status ?? 'DESCONECTADA',
-    statusDetalhe: row?.statusDetalhe ?? null,
-    verificadoEm: row?.verificadoEm ? row.verificadoEm.toISOString() : null,
+    ativo: row.ativo,
+    status: row.status,
+    statusDetalhe: row.statusDetalhe ?? null,
+    verificadoEm: row.verificadoEm ? row.verificadoEm.toISOString() : null,
     campos,
     segredos,
   };

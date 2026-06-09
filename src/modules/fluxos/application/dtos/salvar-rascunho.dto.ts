@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { TipoNoFluxo, TipoVariavelFluxo } from '@prisma/client';
+import { CanalFluxo, TipoNoFluxo, TipoVariavelFluxo } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsArray,
@@ -80,6 +80,10 @@ export class VariavelInputDto {
 }
 
 export class SalvarRascunhoDto {
+  @ApiProperty({ enum: CanalFluxo, default: CanalFluxo.WEB_APP })
+  @IsEnum(CanalFluxo)
+  canal!: CanalFluxo;
+
   @ApiProperty({ type: [NoInputDto] })
   @IsArray()
   @ValidateNested({ each: true })

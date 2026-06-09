@@ -45,7 +45,7 @@ export class IniciarConversaUseCase {
 
     // Fixa a versão publicada do fluxo de atendimento (pinning por conversa).
     const versaoPublicada = await this.resolver.versaoPublicadaDoAtendimento();
-    const fluxo = await this.resolver.resolverParaConversa(versaoPublicada?.id ?? null);
+    const fluxo = await this.resolver.resolverParaConversa(versaoPublicada?.id ?? null, canal);
 
     const passo = await this.engine.processar(
       { usuarioMariaId, noAtual: null, variaveis: variaveisIniciais, canal },

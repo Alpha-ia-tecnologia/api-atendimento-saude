@@ -91,6 +91,7 @@ export class CriarVersaoUseCase {
         const criado = await tx.fluxoNo.create({
           data: {
             fluxoVersaoId: versao.id,
+            canal: n.canal,
             chave: n.chave,
             tipo: n.tipo,
             conteudo: n.conteudo as Prisma.InputJsonValue,
@@ -105,6 +106,7 @@ export class CriarVersaoUseCase {
         await tx.fluxoAresta.create({
           data: {
             fluxoVersaoId: versao.id,
+            canal: a.canal,
             noOrigemId: idNovoPorAntigo.get(a.noOrigemId)!,
             noDestinoId: idNovoPorAntigo.get(a.noDestinoId)!,
             condicao: a.condicao as Prisma.InputJsonValue,

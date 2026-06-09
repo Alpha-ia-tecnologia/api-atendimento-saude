@@ -1,4 +1,10 @@
-import { StatusFluxoVersao, TipoFluxo, TipoNoFluxo, TipoVariavelFluxo } from '@prisma/client';
+import {
+  CanalFluxo,
+  StatusFluxoVersao,
+  TipoFluxo,
+  TipoNoFluxo,
+  TipoVariavelFluxo,
+} from '@prisma/client';
 
 export interface VersaoResumo {
   id: string;
@@ -21,6 +27,7 @@ export interface FluxoResumo {
 export interface NoDetalhe {
   chave: string;
   tipo: TipoNoFluxo;
+  canal: CanalFluxo;
   conteudo: Record<string, unknown>;
   posicaoX: number;
   posicaoY: number;
@@ -29,6 +36,7 @@ export interface NoDetalhe {
 
 export interface ArestaDetalhe {
   id: string;
+  canal: CanalFluxo;
   origemChave: string;
   destinoChave: string;
   condicao: Record<string, unknown>;

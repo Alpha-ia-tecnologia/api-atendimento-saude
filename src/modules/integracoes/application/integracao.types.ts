@@ -21,10 +21,14 @@ export interface ResultadoTeste {
   detalhe: string | null;
 }
 
-/** Estado de um provedor exposto ao CRM (segredos mascarados). */
-export interface ProvedorEstado {
+/** Estado de uma instância de canal exposto ao CRM (segredos mascarados). */
+export interface InstanciaCanalEstado {
+  id: string;
   provedor: ProvedorCanal;
+  /** Apelido da instância (ex.: "SEMUS principal"). */
+  nome: string;
   configurado: boolean;
+  /** True = instância padrão global (envio sem instância explícita usa ela). */
   ativo: boolean;
   status: StatusIntegracao;
   statusDetalhe: string | null;
@@ -44,7 +48,5 @@ export interface ProvedorEstado {
 export interface IntegracoesEstado {
   chaveConfigurada: boolean;
   webhookUrl: string;
-  verifyToken: string | null;
-  evolution: ProvedorEstado;
-  meta: ProvedorEstado;
+  instancias: InstanciaCanalEstado[];
 }

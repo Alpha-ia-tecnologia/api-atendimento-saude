@@ -27,6 +27,9 @@ export interface ConversaComRelacoes {
   /** Variáveis coletadas pelo fluxo — fallback de nome/CPF na anônima. */
   variaveis?: unknown;
   solicitacao: { protocolo: string } | null;
+  /** Instância de WhatsApp que recebeu a conversa (default de envio no Inbox). */
+  instanciaCanalId?: string | null;
+  instanciaCanal?: { id: string; nome: string } | null;
   mensagens: Mensagem[];
 }
 
@@ -84,5 +87,10 @@ export async function mapearConversaDetalhe(
       criadoEm: m.criadoEm,
     })),
   );
-  return { ...resumo, mensagens };
+  return {
+    ...resumo,
+    mensagens,
+    instanciaCanalId: c.instanciaCanalId ?? null,
+    instanciaNome: c.instanciaCanal?.nome ?? null,
+  };
 }

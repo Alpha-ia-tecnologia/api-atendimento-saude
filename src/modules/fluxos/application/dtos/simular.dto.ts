@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { CanalConversa } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { IsIn, IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsEnum, IsIn, IsObject, IsOptional, IsString, ValidateNested } from 'class-validator';
 
 export class AcaoSimularDto {
   @ApiProperty({ enum: ['iniciar', 'opcao', 'texto', 'anexo'] })
@@ -24,6 +25,11 @@ export class AcaoSimularDto {
 }
 
 export class SimularDto {
+  @ApiPropertyOptional({ enum: CanalConversa, default: CanalConversa.WEB })
+  @IsOptional()
+  @IsEnum(CanalConversa)
+  canal?: CanalConversa;
+
   @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsString()

@@ -27,10 +27,17 @@ export class ResponderConversaUseCase {
     conversaId: string,
     operadorId: string,
     conteudo: string,
+    instanciaId?: string | null,
   ): Promise<ConversaDetalheDto> {
     const conversa = await this.prisma.conversa.findUnique({
       where: { id: conversaId },
-      select: { id: true, estado: true, canal: true, contatoExterno: true },
+      select: {
+        id: true,
+        estado: true,
+        canal: true,
+        contatoExterno: true,
+        instanciaCanalId: true,
+      },
     });
     if (!conversa) {
       throw new NotFoundException('Conversa não encontrada.');
@@ -65,11 +72,16 @@ export class ResponderConversaUseCase {
     // solicitante. Falha de envio não desfaz a mensagem — fica registrada no
     // metadados pra tela sinalizar.
     if (conversa.canal === CanalConversa.WHATSAPP && conversa.contatoExterno) {
+      // Instância escolhida no modal, senão a que recebeu a conversa, senão a padrão.
+      const instanciaEnvio = instanciaId ?? conversa.instanciaCanalId ?? undefined;
       try {
-        const { idExterno } = await this.messaging.enviarTexto({
-          contato: conversa.contatoExterno,
-          texto: conteudo.trim(),
-        });
+        const { idExterno } = await this.messaging.enviarTexto(
+          {
+            contato: conversa.contatoExterno,
+            texto: conteudo.trim(),
+          },
+          instanciaEnvio,
+        );
         await this.prisma.mensagem.update({
           where: { id: mensagem.id },
           data: { metadados: { operadorId, idExterno } as Prisma.InputJsonValue },

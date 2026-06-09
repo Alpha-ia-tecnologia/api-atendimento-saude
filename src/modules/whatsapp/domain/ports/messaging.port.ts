@@ -3,8 +3,9 @@
  *
  * O domínio não conhece o provedor: `EvolutionAdapter` e `MetaCloudAdapter`
  * implementam o envio/normalização e o `MessagingService` (injetado pelo
- * token `MESSAGING_PORT`) escolhe o adapter conforme o provedor ATIVO na
- * tabela `IntegracaoCanal` — trocar Evolution ↔ Meta não toca no FlowEngine.
+ * token `MESSAGING_PORT`) escolhe o adapter conforme a INSTÂNCIA na tabela
+ * `InstanciaCanal` — várias instâncias por provedor; o envio usa a instância
+ * informada (ou a padrão) e o webhook resolve a instância de origem.
  */
 
 /** Mensagem recebida do provedor, já normalizada (canônica). */
@@ -18,6 +19,11 @@ export interface MensagemEntrante {
   texto?: string;
   /** URL do anexo já hospedado no NOSSO MinIO (mídia é baixada na normalização). */
   anexoUrl?: string;
+  /**
+   * Instância que recebeu a mensagem (casada pelo identificador do payload).
+   * Null quando não foi possível casar — o orquestrador cai na instância padrão.
+   */
+  instanciaCanalId?: string | null;
   recebidoEm: Date;
 }
 
@@ -34,9 +40,13 @@ export interface ResultadoEnvio {
 }
 
 export interface MessagingPort {
-  /** True quando há provedor ativo e com credenciais legíveis. */
+  /** True quando há instância padrão com credenciais legíveis. */
   disponivel(): Promise<boolean>;
-  enviarTexto(msg: MensagemSaidaWhatsapp): Promise<ResultadoEnvio>;
+  /**
+   * Envia pelo canal. Com `instanciaId` usa aquela instância; sem, usa a
+   * padrão global (`ativo: true`).
+   */
+  enviarTexto(msg: MensagemSaidaWhatsapp, instanciaId?: string | null): Promise<ResultadoEnvio>;
   /**
    * Converte um payload bruto de webhook (Evolution ou Meta — detectado pela
    * forma) em mensagens canônicas. Eventos que não são mensagem de usuário

@@ -24,18 +24,18 @@ export class StatusCanalUseCase {
   ) {}
 
   async execute(): Promise<StatusCanalDto> {
-    const ativo = await this.prisma.integracaoCanal.findFirst({ where: { ativo: true } });
+    const ativo = await this.prisma.instanciaCanal.findFirst({ where: { ativo: true } });
     if (!ativo) {
       return {
         provedor: null,
         status: StatusIntegracao.DESCONECTADA,
-        detalhe: 'Nenhum provedor ativo.',
+        detalhe: 'Nenhuma instância padrão ativa.',
         verificadoEm: null,
       };
     }
 
     try {
-      const resultado = await this.testar.execute(ativo.provedor);
+      const resultado = await this.testar.execute(ativo.id);
       return {
         provedor: ativo.provedor,
         status: resultado.status,

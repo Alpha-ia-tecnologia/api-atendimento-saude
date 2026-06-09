@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, MaxLength, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 
 export class EnviarTesteDto {
   @ApiProperty({
@@ -10,4 +10,11 @@ export class EnviarTesteDto {
   @MinLength(8, { message: 'Informe um número de telefone válido.' })
   @MaxLength(20)
   numero!: string;
+
+  @ApiPropertyOptional({
+    description: 'Instância para o envio. Omitido: usa a instância padrão.',
+  })
+  @IsOptional()
+  @IsUUID()
+  instanciaId?: string;
 }

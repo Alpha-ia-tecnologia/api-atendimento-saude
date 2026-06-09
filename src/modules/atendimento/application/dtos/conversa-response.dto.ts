@@ -45,4 +45,11 @@ export class ConversaResumoDto {
 /** Detalhe de uma conversa, com o histórico completo de mensagens. */
 export class ConversaDetalheDto extends ConversaResumoDto {
   @ApiProperty({ type: [MensagemDto] }) mensagens!: MensagemDto[];
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Instância de WhatsApp que recebeu a conversa (default de envio).',
+  })
+  instanciaCanalId!: string | null;
+  @ApiPropertyOptional({ nullable: true, description: 'Nome da instância da conversa.' })
+  instanciaNome!: string | null;
 }

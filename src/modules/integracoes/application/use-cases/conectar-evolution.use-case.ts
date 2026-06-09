@@ -30,7 +30,7 @@ export class ConectarEvolutionUseCase {
     private readonly config: ConfigService,
   ) {}
 
-  async execute(): Promise<ResultadoConexaoEvolution> {
+  async execute(instanciaId: string): Promise<ResultadoConexaoEvolution> {
     if (!this.crypto.disponivel()) {
       throw new BadRequestException(
         'ENCRYPTION_KEY não configurada no servidor — não é possível ler as credenciais.',
@@ -46,11 +46,14 @@ export class ConectarEvolutionUseCase {
         'Configure PUBLIC_BASE_URL no servidor (URL pública do backend) para que a Evolution consiga entregar as mensagens recebidas.',
       );
     }
-    const row = await this.prisma.integracaoCanal.findUnique({
-      where: { provedor: ProvedorCanal.EVOLUTION },
+    const row = await this.prisma.instanciaCanal.findUnique({
+      where: { id: instanciaId },
     });
     if (!row?.credenciaisCifradas) {
-      throw new NotFoundException('Provedor Evolution ainda não configurado.');
+      throw new NotFoundException('Instância Evolution ainda não configurada.');
+    }
+    if (row.provedor !== ProvedorCanal.EVOLUTION) {
+      throw new BadRequestException('Só instâncias Evolution conectam por QR Code.');
     }
     const { cred, ilegivel } = lerCredenciais<EvolutionCredenciais>(
       this.crypto,
@@ -58,7 +61,7 @@ export class ConectarEvolutionUseCase {
     );
     if (ilegivel || !cred) {
       throw new BadRequestException(
-        'Não foi possível decifrar as credenciais com a chave atual. Reconfigure o provedor.',
+        'Não foi possível decifrar as credenciais com a chave atual. Reconfigure a instância.',
       );
     }
 
@@ -66,8 +69,8 @@ export class ConectarEvolutionUseCase {
     try {
       resultado = await this.tester.conectarEvolution(cred);
     } catch (err) {
-      await this.prisma.integracaoCanal.update({
-        where: { provedor: ProvedorCanal.EVOLUTION },
+      await this.prisma.instanciaCanal.update({
+        where: { id: instanciaId },
         data: {
           status: StatusIntegracao.ERRO,
           statusDetalhe: (err as Error).message,
@@ -82,8 +85,8 @@ export class ConectarEvolutionUseCase {
     try {
       await this.tester.configurarWebhookEvolution(cred, webhookUrl);
     } catch (err) {
-      await this.prisma.integracaoCanal.update({
-        where: { provedor: ProvedorCanal.EVOLUTION },
+      await this.prisma.instanciaCanal.update({
+        where: { id: instanciaId },
         data: {
           status: StatusIntegracao.ERRO,
           statusDetalhe: (err as Error).message,
@@ -94,8 +97,8 @@ export class ConectarEvolutionUseCase {
     }
 
     if (resultado.jaConectada) {
-      await this.prisma.integracaoCanal.update({
-        where: { provedor: ProvedorCanal.EVOLUTION },
+      await this.prisma.instanciaCanal.update({
+        where: { id: instanciaId },
         data: {
           status: StatusIntegracao.CONECTADA,
           statusDetalhe: `Instância ${cred.instance} conectada.`,

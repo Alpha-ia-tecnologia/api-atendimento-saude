@@ -22,14 +22,17 @@ export interface ResultadoEnvioTeste {
 export class EnviarTesteUseCase {
   constructor(@Inject(MESSAGING_PORT) private readonly messaging: MessagingPort) {}
 
-  async execute(numero: string): Promise<ResultadoEnvioTeste> {
+  async execute(numero: string, instanciaId?: string | null): Promise<ResultadoEnvioTeste> {
     const contato = this.normalizar(numero);
     if (contato.length < 10) {
       throw new BadRequestException('Informe um número válido com DDD (ex.: (98) 99999-9999).');
     }
 
     try {
-      const { idExterno } = await this.messaging.enviarTexto({ contato, texto: MENSAGEM_TESTE });
+      const { idExterno } = await this.messaging.enviarTexto(
+        { contato, texto: MENSAGEM_TESTE },
+        instanciaId ?? null,
+      );
       return { enviado: true, contato, idExterno };
     } catch (err) {
       // Sem provedor ativo / credenciais ilegíveis já vêm como HttpException com

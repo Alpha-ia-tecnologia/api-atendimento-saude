@@ -43,7 +43,7 @@ export class EnviarAcaoUseCase {
     const acao = this.mapearAcao(dto);
 
     // Usa a MESMA versão fixada no início (pinning): publicar não muda esta conversa.
-    const fluxo = await this.resolver.resolverParaConversa(conversa.fluxoVersaoId);
+    const fluxo = await this.resolver.resolverParaConversa(conversa.fluxoVersaoId, conversa.canal);
 
     const passo = await this.engine.processar(
       {

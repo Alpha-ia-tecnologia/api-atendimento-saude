@@ -1,10 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { TipoEspecialidade, TipoNoFluxo } from '@prisma/client';
+import { CanalConversa, CanalFluxo, TipoEspecialidade, TipoNoFluxo } from '@prisma/client';
 
 import { PrismaService } from '../../../../shared/database/prisma/prisma.service';
 import { ListarEspecialidadesUseCase } from '../../../especialidades/application/use-cases/listar-especialidades.use-case';
 import { validarCampo } from '../../../atendimento/application/utils/validacao';
-import { interpolar, type Variaveis } from '../fluxo-interpolacao';
+import { grupoDoCanal, interpolar, type Variaveis } from '../fluxo-interpolacao';
 import { AcaoSimularDto } from '../dtos/simular.dto';
 
 type CampoTexto = 'nome' | 'cpf' | 'endereco' | 'telefone';
@@ -57,7 +57,12 @@ export class SimuladorFluxoService {
   async simular(
     fluxoId: string,
     numero: number,
-    entrada: { noAtual?: string | null; variaveis?: Variaveis; acao: AcaoSimularDto },
+    entrada: {
+      noAtual?: string | null;
+      variaveis?: Variaveis;
+      acao: AcaoSimularDto;
+      canal?: CanalConversa;
+    },
   ): Promise<ResultadoSimulacao> {
     const versao = await this.prisma.fluxoVersao.findFirst({
       where: { fluxoAtendimentoId: fluxoId, numero },
@@ -65,9 +70,15 @@ export class SimuladorFluxoService {
     });
     if (!versao) throw new NotFoundException('Versão não encontrada.');
 
+    // Simula o subgrafo do canal escolhido; WhatsApp vazio cai no Web/App.
+    const grupo = grupoDoCanal(entrada.canal ?? CanalConversa.WEB);
+    const canalEfetivo = versao.nos.some((n) => n.canal === grupo) ? grupo : CanalFluxo.WEB_APP;
+    const nosDoCanal = versao.nos.filter((n) => n.canal === canalEfetivo);
+    const arestasDoCanal = versao.arestas.filter((a) => a.canal === canalEfetivo);
+
     const nosPorChave = new Map<string, NoSim>();
     const idParaChave = new Map<string, string>();
-    for (const n of versao.nos) {
+    for (const n of nosDoCanal) {
       idParaChave.set(n.id, n.chave);
       nosPorChave.set(n.chave, {
         chave: n.chave,
@@ -78,7 +89,7 @@ export class SimuladorFluxoService {
     }
     // Arestas de saída por chave de origem, ordenadas.
     const saidas = new Map<string, { destino: string; condicao: Record<string, unknown> }[]>();
-    for (const a of [...versao.arestas].sort((x, y) => x.ordem - y.ordem)) {
+    for (const a of [...arestasDoCanal].sort((x, y) => x.ordem - y.ordem)) {
       const origem = idParaChave.get(a.noOrigemId);
       const destino = idParaChave.get(a.noDestinoId);
       if (!origem || !destino) continue;
@@ -88,7 +99,7 @@ export class SimuladorFluxoService {
     }
 
     const inicial =
-      versao.nos.find((n) => n.tipo === TipoNoFluxo.INICIO) ?? versao.nos.find((n) => n.ehInicial);
+      nosDoCanal.find((n) => n.tipo === TipoNoFluxo.INICIO) ?? nosDoCanal.find((n) => n.ehInicial);
     const inicialChave = inicial?.chave ?? null;
 
     const variaveis: Variaveis = { ...(entrada.variaveis ?? {}) };
@@ -266,6 +277,11 @@ export class SimuladorFluxoService {
           variaveis._protocolo = 'SIMULACAO';
           variaveis._solicitacaoId = 'SIMULACAO';
           chave = this.destinoSempre(no.chave, saidas);
+          continue;
+
+        case TipoNoFluxo.REDIRECIONAR:
+          // Encaminha pro nó referenciado (`conteudo.alvo`), sem aresta.
+          chave = (no.conteudo.alvo as string | undefined) ?? null;
           continue;
 
         case TipoNoFluxo.ESCOLHA:

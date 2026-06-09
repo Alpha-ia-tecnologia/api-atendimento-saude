@@ -43,6 +43,7 @@ export function mapVersaoDetalhe(
     nos: versao.nos.map((n) => ({
       chave: n.chave,
       tipo: n.tipo,
+      canal: n.canal,
       conteudo: (n.conteudo ?? {}) as Record<string, unknown>,
       posicaoX: n.posicaoX,
       posicaoY: n.posicaoY,
@@ -50,6 +51,7 @@ export function mapVersaoDetalhe(
     })),
     arestas: versao.arestas.map((a) => ({
       id: a.id,
+      canal: a.canal,
       origemChave: chavePorId.get(a.noOrigemId) ?? '',
       destinoChave: chavePorId.get(a.noDestinoId) ?? '',
       condicao: (a.condicao ?? {}) as Record<string, unknown>,

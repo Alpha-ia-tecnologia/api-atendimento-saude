@@ -11,6 +11,7 @@ import { MoverFluxoUseCase } from './application/use-cases/mover-fluxo.use-case'
 import { SalvarRascunhoUseCase } from './application/use-cases/salvar-rascunho.use-case';
 import { PublicarVersaoUseCase } from './application/use-cases/publicar-versao.use-case';
 import { ValidarFluxoUseCase } from './application/use-cases/validar-fluxo.use-case';
+import { ClonarCanalUseCase } from './application/use-cases/clonar-canal.use-case';
 import { SimuladorFluxoService } from './application/services/simulador-fluxo.service';
 
 @Module({
@@ -25,6 +26,7 @@ import { SimuladorFluxoService } from './application/services/simulador-fluxo.se
     SalvarRascunhoUseCase,
     PublicarVersaoUseCase,
     ValidarFluxoUseCase,
+    ClonarCanalUseCase,
     SimuladorFluxoService,
   ],
 })

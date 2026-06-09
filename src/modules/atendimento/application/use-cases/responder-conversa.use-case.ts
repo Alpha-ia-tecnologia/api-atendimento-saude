@@ -10,6 +10,7 @@ import {
 
 import { PrismaService } from '../../../../shared/database/prisma/prisma.service';
 import { MESSAGING_PORT, MessagingPort } from '../../../whatsapp/domain/ports/messaging.port';
+import { expirouPorInatividade } from '../conversa-inatividade';
 import { ConversaDetalheDto } from '../dtos/conversa-response.dto';
 import { ObterConversaGestorUseCase } from './obter-conversa-gestor.use-case';
 
@@ -37,10 +38,19 @@ export class ResponderConversaUseCase {
         canal: true,
         contatoExterno: true,
         instanciaCanalId: true,
+        ultimaInteracaoEm: true,
       },
     });
     if (!conversa) {
       throw new NotFoundException('Conversa não encontrada.');
+    }
+    // Parada há mais de 24h → expira por inatividade.
+    if (expirouPorInatividade(conversa.estado, conversa.ultimaInteracaoEm)) {
+      await this.prisma.conversa.update({
+        where: { id: conversa.id },
+        data: { estado: EstadoConversa.EXPIRADA, encerradaEm: new Date() },
+      });
+      conversa.estado = EstadoConversa.EXPIRADA;
     }
     if (
       conversa.estado === EstadoConversa.ENCERRADA ||

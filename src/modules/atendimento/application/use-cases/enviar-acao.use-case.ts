@@ -8,6 +8,7 @@ import {
 } from '@prisma/client';
 
 import { PrismaService } from '../../../../shared/database/prisma/prisma.service';
+import { expirouPorInatividade } from '../conversa-inatividade';
 import { AcaoEntrada, FlowEngineService } from '../services/flow-engine.service';
 import { FluxoResolverService } from '../services/fluxo-resolver.service';
 import { EnviarAcaoDto, TipoAcao } from '../dtos/enviar-acao.dto';
@@ -32,6 +33,14 @@ export class EnviarAcaoUseCase {
     });
     if (!conversa) {
       throw new NotFoundException('Conversa não encontrada.');
+    }
+    // Parada há mais de 24h → expira por inatividade.
+    if (expirouPorInatividade(conversa.estado, conversa.ultimaInteracaoEm)) {
+      await this.prisma.conversa.update({
+        where: { id: conversa.id },
+        data: { estado: EstadoConversa.EXPIRADA, encerradaEm: new Date() },
+      });
+      conversa.estado = EstadoConversa.EXPIRADA;
     }
     if (
       conversa.estado === EstadoConversa.ENCERRADA ||

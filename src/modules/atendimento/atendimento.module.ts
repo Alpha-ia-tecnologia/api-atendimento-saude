@@ -9,6 +9,7 @@ import { WhatsappModule } from '../whatsapp/whatsapp.module';
 import { AtendimentoController } from './presentation/controllers/atendimento.controller';
 import { GestorConversasController } from './presentation/controllers/gestor-conversas.controller';
 import { WebhookWhatsappController } from './presentation/controllers/webhook-whatsapp.controller';
+import { ExpirarConversasService } from './application/services/expirar-conversas.service';
 import { FlowEngineService } from './application/services/flow-engine.service';
 import { FluxoResolverService } from './application/services/fluxo-resolver.service';
 import { OcrEncaminhamentoService } from './application/services/ocr-encaminhamento.service';
@@ -32,6 +33,7 @@ import { ProcessarWebhookWhatsappUseCase } from './application/use-cases/process
   ],
   controllers: [AtendimentoController, GestorConversasController, WebhookWhatsappController],
   providers: [
+    ExpirarConversasService,
     FlowEngineService,
     FluxoResolverService,
     OcrEncaminhamentoService,

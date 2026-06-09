@@ -15,16 +15,11 @@ import {
   MESSAGING_PORT,
   MessagingPort,
 } from '../../../whatsapp/domain/ports/messaging.port';
+import { ESTADOS_ATIVOS, expirouPorInatividade } from '../conversa-inatividade';
 import { FLUXO_ATENDIMENTO_V1 } from '../flows/atendimento-v1.flow';
 import { Fluxo, OpcaoFluxo, Variaveis } from '../flows/tipos';
 import { AcaoEntrada, FlowEngineService, ResultadoPasso } from '../services/flow-engine.service';
 import { FluxoResolverService } from '../services/fluxo-resolver.service';
-
-const ESTADOS_ATIVOS: EstadoConversa[] = [
-  EstadoConversa.ABERTA,
-  EstadoConversa.EM_ANDAMENTO,
-  EstadoConversa.AGUARDANDO_SOLICITANTE,
-];
 
 /**
  * Orquestra o canal WhatsApp sobre o MESMO FlowEngine do App/Web (doc 13):
@@ -91,6 +86,16 @@ export class ProcessarWebhookWhatsappUseCase {
       },
       orderBy: { ultimaInteracaoEm: 'desc' },
     });
+
+    // Parada há mais de 24h → expira e recomeça do zero (não retoma o fluxo).
+    if (conversa && expirouPorInatividade(conversa.estado, conversa.ultimaInteracaoEm)) {
+      await this.prisma.conversa.update({
+        where: { id: conversa.id },
+        data: { estado: EstadoConversa.EXPIRADA, encerradaEm: new Date() },
+      });
+      await this.iniciarConversa(msg);
+      return;
+    }
 
     if (!conversa) {
       await this.iniciarConversa(msg);

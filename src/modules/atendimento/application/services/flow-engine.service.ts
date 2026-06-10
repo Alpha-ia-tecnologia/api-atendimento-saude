@@ -94,7 +94,7 @@ export class FlowEngineService {
       return this.caminhar(fluxo.inicial, variaveis, mensagens, ctx, fluxo);
     }
 
-    const consumo = await this.consumirEntrada(atual, acao, variaveis);
+    const consumo = await this.consumirEntrada(atual, acao, variaveis, ctx.canal);
     if ('erro' in consumo) {
       // Entrada inválida: emite erro e mantém o nó (front re-renderiza a entrada).
       mensagens.push({ texto: consumo.erro });
@@ -130,6 +130,7 @@ export class FlowEngineService {
     no: No,
     acao: AcaoEntrada,
     variaveis: Variaveis,
+    canal: CanalConversa,
   ): Promise<{ proximo: string } | { erro: string }> {
     switch (no.tipo) {
       case 'ESCOLHA': {
@@ -138,7 +139,13 @@ export class FlowEngineService {
           !!acao.opcaoId &&
           (acao.opcaoId in no.ramos || no.opcoes.some((o) => o.id === acao.opcaoId));
         if (!valido || !acao.opcaoId) {
-          return { erro: 'Ops! Não entendi a opção. Toca em um dos botões, por favor. 🙂' };
+          // No WhatsApp não há botões: as opções viram lista numerada em texto.
+          return {
+            erro:
+              canal === CanalConversa.WHATSAPP
+                ? 'Ops! Não entendi a opção. Responde com o número de uma das opções, por favor. 🙂'
+                : 'Ops! Não entendi a opção. Toca em um dos botões, por favor. 🙂',
+          };
         }
         // Guarda a escolha pro nó de Condição rotear adiante.
         variaveis._opcao = acao.opcaoId;

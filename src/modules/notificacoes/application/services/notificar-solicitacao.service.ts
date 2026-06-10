@@ -303,13 +303,35 @@ export class NotificarSolicitacaoService {
    * Números de WhatsApp de destino (deduplicados, com DDI): o telefone digitado
    * no fluxo (paciente) + o número que conversou pelo WhatsApp (solicitante).
    * No caso "para mim" os dois coincidem e vira um envio só.
+   *
+   * A dedup compara por uma chave que ignora o 9º dígito de celular BR: o número
+   * digitado no fluxo costuma vir com o 9 (…9XXXXXXXX) e o `contatoExterno` do
+   * provedor pode vir sem (…XXXXXXXX). Sem isso a mesma pessoa receberia 2 vezes.
+   * Quando coincidem, mantemos o `contatoExterno` (já validado no WhatsApp).
    */
   private destinosWhatsapp(telefoneFluxo?: string | null, contatoConversa?: string | null): string[] {
-    const set = new Set<string>();
+    const porChave = new Map<string, string>();
     for (const n of [contatoConversa, telefoneFluxo]) {
       const norm = this.normalizarNumeroWhatsapp(n);
-      if (norm) set.add(norm);
+      if (!norm) continue;
+      const chave = this.chaveComparacaoWhatsapp(norm);
+      if (!porChave.has(chave)) porChave.set(chave, norm);
     }
-    return [...set];
+    return [...porChave.values()];
+  }
+
+  /**
+   * Chave de comparação de números: para celular BR (55 + DDD + 9 dígitos
+   * começando em 9), remove o 9º dígito para que “com” e “sem” o 9 colidam.
+   */
+  private chaveComparacaoWhatsapp(numero: string): string {
+    if (numero.startsWith('55') && numero.length === 13) {
+      const ddd = numero.slice(2, 4);
+      const assinante = numero.slice(4);
+      if (assinante.length === 9 && assinante.startsWith('9')) {
+        return `55${ddd}${assinante.slice(1)}`;
+      }
+    }
+    return numero;
   }
 }

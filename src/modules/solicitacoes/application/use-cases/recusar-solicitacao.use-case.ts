@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { StatusSolicitacao } from '@prisma/client';
+import { CanalConversa, EstadoConversa, StatusSolicitacao } from '@prisma/client';
 
 import { AUDIT_EVENT } from '../../../audit/application/events/audit.event';
 import { MinioService } from '../../../files/application/services/minio.service';
@@ -44,6 +44,13 @@ export class RecusarSolicitacaoUseCase {
 
     // H6.3 — avisa o solicitante com o motivo (inbox in-app + WhatsApp).
     await this.notificar.solicitacaoRecusada(atualizada);
+
+    // B4 — recusa encerra a conversa de WhatsApp vinculada (o solicitante já
+    // recebeu o motivo; uma nova mensagem inicia outra conversa do zero).
+    await this.prisma.conversa.updateMany({
+      where: { solicitacaoId: id, canal: CanalConversa.WHATSAPP },
+      data: { estado: EstadoConversa.ENCERRADA, encerradaEm: new Date() },
+    });
 
     this.eventEmitter.emit(AUDIT_EVENT, {
       userId: operadorId,

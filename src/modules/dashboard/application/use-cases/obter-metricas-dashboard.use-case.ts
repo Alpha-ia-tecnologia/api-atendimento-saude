@@ -34,6 +34,7 @@ export class ObterMetricasDashboardUseCase {
       volumePorDia,
       tempoMedioRows,
       picoPorHoraDia,
+      rankingOperadoresRows,
     ] = await Promise.all([
       this.prisma.solicitacao.groupBy({
         by: ['status'],
@@ -72,6 +73,31 @@ export class ObterMetricasDashboardUseCase {
         FROM solicitacoes
         WHERE criado_em >= ${de} AND criado_em <= ${ate} ${espCond}
         GROUP BY 1, 2
+      `),
+      // --- Ranking de operadores: agrega por agente responsável no período ---
+      this.prisma.$queryRaw<
+        {
+          operadorId: string;
+          nome: string;
+          emAtendimento: number;
+          aprovadas: number;
+          tmeSegundos: number | null;
+          tmaSegundos: number | null;
+        }[]
+      >(Prisma.sql`
+        SELECT u.id AS "operadorId",
+               u.nome_completo AS nome,
+               COUNT(*) FILTER (WHERE s.status::text = 'EM_ATENDIMENTO')::int AS "emAtendimento",
+               COUNT(*) FILTER (WHERE s.status::text = 'AGENDADA')::int AS "aprovadas",
+               EXTRACT(EPOCH FROM AVG(s.assumida_em - s.criado_em))::float8 AS "tmeSegundos",
+               EXTRACT(EPOCH FROM AVG(s.aprovada_em - s.assumida_em))::float8 AS "tmaSegundos"
+        FROM solicitacoes s
+        JOIN usuarios_crm u ON u.id = s.agente_responsavel_crm_id
+        WHERE s.criado_em >= ${de} AND s.criado_em <= ${ate}
+          AND s.agente_responsavel_crm_id IS NOT NULL
+          ${espCond}
+        GROUP BY u.id, u.nome_completo
+        ORDER BY "aprovadas" DESC, "emAtendimento" DESC
       `),
     ]);
 
@@ -117,6 +143,16 @@ export class ObterMetricasDashboardUseCase {
     const tempoMedioAtendimentoHoras =
       tempoMedioRows[0]?.horas != null ? Number(tempoMedioRows[0].horas) : null;
 
+    // --- rankingOperadores: normaliza contagens e segundos (null-safe) ---
+    const rankingOperadores = rankingOperadoresRows.map((r) => ({
+      operadorId: r.operadorId,
+      nome: r.nome,
+      emAtendimento: Number(r.emAtendimento),
+      aprovadas: Number(r.aprovadas),
+      tmeSegundos: r.tmeSegundos != null ? Number(r.tmeSegundos) : null,
+      tmaSegundos: r.tmaSegundos != null ? Number(r.tmaSegundos) : null,
+    }));
+
     return {
       de: de.toISOString(),
       ate: ate.toISOString(),
@@ -127,6 +163,7 @@ export class ObterMetricasDashboardUseCase {
       volumePorDia,
       tempoMedioAtendimentoHoras,
       picoPorHoraDia,
+      rankingOperadores,
     };
   }
 

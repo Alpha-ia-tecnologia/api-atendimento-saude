@@ -50,12 +50,16 @@ export class AprovarSolicitacaoUseCase {
         agendamentoPdfUrl: params.pdfUrl,
         dataAgendada: params.dataAgendada,
         agenteResponsavelCrmId: operadorId,
+        aprovadaEm: new Date(),
       },
       include: { especialidade: true, anexos: true, agenteResponsavel: true },
     });
 
     // H6.3 — avisa o solicitante (inbox in-app + WhatsApp). Nunca lança.
     await this.notificar.solicitacaoAgendada(atualizada);
+
+    // B3 — envia o comprovante (PDF) pela conversa de WhatsApp vinculada. Nunca lança.
+    await this.notificar.enviarPdfAgendamento(id);
 
     this.eventEmitter.emit(AUDIT_EVENT, {
       userId: operadorId,

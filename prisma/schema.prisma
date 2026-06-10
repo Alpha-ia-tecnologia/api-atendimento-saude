@@ -350,6 +350,12 @@ model Solicitacao {
 
   // -------- Agendamento / atendimento (preenchidos pelo CRM) --------
   agenteResponsavelCrmId String?   @map("agente_responsavel_crm_id") @db.Uuid
+  /// Quando o operador assumiu o atendimento (SOLICITADA → EM_ATENDIMENTO).
+  /// Base do TME (tempo médio de espera = assumidaEm - criadoEm).
+  assumidaEm             DateTime? @map("assumida_em")
+  /// Quando o operador aprovou (EM_ATENDIMENTO → AGENDADA).
+  /// Base do TMA (tempo médio de atendimento = aprovadaEm - assumidaEm).
+  aprovadaEm             DateTime? @map("aprovada_em")
   motivoNaoAprovacao     String?   @map("motivo_nao_aprovacao")
   /// PDF do agendamento (SISREG) anexado pelo operador ao aprovar.
   agendamentoPdfUrl      String?   @map("agendamento_pdf_url")

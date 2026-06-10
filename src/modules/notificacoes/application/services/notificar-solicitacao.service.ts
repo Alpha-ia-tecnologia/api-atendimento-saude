@@ -1,8 +1,12 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
+  AutorMensagem,
+  CanalConversa,
   CanalNotificacao,
+  DirecaoMensagem,
   OrigemSolicitacao,
   StatusNotificacao,
+  TipoMensagem,
   TipoNotificacao,
 } from '@prisma/client';
 
@@ -78,6 +82,71 @@ export class NotificarSolicitacaoService {
         `(protocolo ${s.protocolo}) não foi aprovada.${motivo}`,
       enviarWhatsapp: true,
     });
+  }
+
+  /**
+   * B3 — Envia o comprovante (PDF) pela conversa de WhatsApp vinculada à
+   * solicitação, disparado na aprovação. A mensagem é fixa.
+   * NUNCA lança: o envio é melhor-esforço e não pode desfazer a aprovação.
+   */
+  async enviarPdfAgendamento(solicitacaoId: string): Promise<void> {
+    const MENSAGEM = 'Seu agendamento foi concluído! ✅ Segue o comprovante em anexo.';
+    try {
+      const conversa = await this.prisma.conversa.findUnique({
+        where: { solicitacaoId },
+        select: {
+          id: true,
+          canal: true,
+          contatoExterno: true,
+          instanciaCanalId: true,
+        },
+      });
+      // Sem conversa de WhatsApp com contato: nada a enviar.
+      if (!conversa || conversa.canal !== CanalConversa.WHATSAPP || !conversa.contatoExterno) {
+        return;
+      }
+
+      const solicitacao = await this.prisma.solicitacao.findUnique({
+        where: { id: solicitacaoId },
+        select: { agendamentoPdfUrl: true },
+      });
+      const documentoUrl = solicitacao?.agendamentoPdfUrl;
+      if (!documentoUrl) return;
+
+      const mensagem = MENSAGEM;
+
+      if (await this.messaging.disponivel()) {
+        await this.messaging.enviarDocumento(
+          {
+            contato: conversa.contatoExterno,
+            documentoUrl,
+            nomeArquivo: 'agendamento.pdf',
+            legenda: mensagem,
+          },
+          conversa.instanciaCanalId ?? undefined,
+        );
+      }
+
+      // Registra a saída na conversa e bumpa ultimaInteracaoEm (@updatedAt).
+      await this.prisma.mensagem.create({
+        data: {
+          conversaId: conversa.id,
+          direcao: DirecaoMensagem.SAIDA,
+          autor: AutorMensagem.BOT,
+          tipo: TipoMensagem.DOCUMENTO,
+          conteudo: mensagem,
+          anexoUrl: documentoUrl,
+        },
+      });
+      await this.prisma.conversa.update({
+        where: { id: conversa.id },
+        data: {},
+      });
+    } catch (err) {
+      this.logger.error(
+        `Falha ao enviar PDF do agendamento da solicitação ${solicitacaoId}: ${(err as Error).message}`,
+      );
+    }
   }
 
   // ---------------------------------------------------------------- privados

@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { OrigemSolicitacao, StatusSolicitacao, TipoEspecialidade } from '@prisma/client';
 
 export class EspecialidadeMetricaDto {
@@ -17,6 +17,31 @@ export class PicoHoraDiaDto {
   @ApiProperty({ description: '0=domingo … 6=sábado' }) diaSemana!: number;
   @ApiProperty({ description: '0–23' }) hora!: number;
   @ApiProperty() total!: number;
+}
+
+export class OperadorRankingDto {
+  @ApiProperty() operadorId!: string;
+  @ApiProperty() nome!: string;
+
+  @ApiProperty({ description: 'Qtd. de solicitações EM_ATENDIMENTO do operador no período.' })
+  emAtendimento!: number;
+
+  @ApiProperty({ description: 'Qtd. de solicitações AGENDADA do operador no período.' })
+  aprovadas!: number;
+
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description: 'Tempo médio de espera (segundos): AVG(assumida_em - criado_em).',
+  })
+  tmeSegundos!: number | null;
+
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    description: 'Tempo médio de atendimento (segundos): AVG(aprovada_em - assumida_em).',
+  })
+  tmaSegundos!: number | null;
 }
 
 export class MetricasDashboardDto {
@@ -53,4 +78,10 @@ export class MetricasDashboardDto {
 
   @ApiProperty({ type: [PicoHoraDiaDto] })
   picoPorHoraDia!: PicoHoraDiaDto[];
+
+  @ApiProperty({
+    type: [OperadorRankingDto],
+    description: 'Ranking de operadores no período (ordenado por aprovadas, depois em atendimento).',
+  })
+  rankingOperadores!: OperadorRankingDto[];
 }

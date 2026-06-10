@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MinioService } from '../../../files/application/services/minio.service';
 import { EvolutionCredenciais } from '../../../integracoes/application/integracao.types';
 import {
+  MensagemDocumentoWhatsapp,
   MensagemEntrante,
   MensagemSaidaWhatsapp,
   ResultadoEnvio,
@@ -65,6 +66,33 @@ export class EvolutionAdapter {
     if (!resp.ok) {
       const corpo = await resp.text().catch(() => '');
       throw new Error(`Evolution sendText falhou (HTTP ${resp.status}): ${corpo.slice(0, 200)}`);
+    }
+    const json = (await resp.json().catch(() => null)) as { key?: { id?: string } } | null;
+    return { idExterno: json?.key?.id ?? null };
+  }
+
+  async enviarDocumento(
+    cred: EvolutionCredenciais,
+    msg: MensagemDocumentoWhatsapp,
+  ): Promise<ResultadoEnvio> {
+    const base = cred.baseUrl.replace(/\/+$/, '');
+    const url = `${base}/message/sendMedia/${encodeURIComponent(cred.instance)}`;
+    const headers = { 'Content-Type': 'application/json', apikey: cred.apiKey };
+
+    const resp = await fetchComTimeout(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        number: msg.contato,
+        mediatype: 'document',
+        media: msg.documentoUrl,
+        fileName: msg.nomeArquivo,
+        caption: msg.legenda,
+      }),
+    });
+    if (!resp.ok) {
+      const corpo = await resp.text().catch(() => '');
+      throw new Error(`Evolution sendMedia falhou (HTTP ${resp.status}): ${corpo.slice(0, 200)}`);
     }
     const json = (await resp.json().catch(() => null)) as { key?: { id?: string } } | null;
     return { idExterno: json?.key?.id ?? null };

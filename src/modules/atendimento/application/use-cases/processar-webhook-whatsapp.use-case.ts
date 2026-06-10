@@ -15,7 +15,11 @@ import {
   MESSAGING_PORT,
   MessagingPort,
 } from '../../../whatsapp/domain/ports/messaging.port';
-import { ESTADOS_ATIVOS, expirouPorInatividade } from '../conversa-inatividade';
+import {
+  ESTADOS_ATIVOS,
+  expirouPorInatividade,
+  solicitacaoBloqueiaExpiracao,
+} from '../conversa-inatividade';
 import { FLUXO_ATENDIMENTO_V1 } from '../flows/atendimento-v1.flow';
 import { Fluxo, OpcaoFluxo, Variaveis } from '../flows/tipos';
 import { AcaoEntrada, FlowEngineService, ResultadoPasso } from '../services/flow-engine.service';
@@ -85,10 +89,16 @@ export class ProcessarWebhookWhatsappUseCase {
         estado: { in: ESTADOS_ATIVOS },
       },
       orderBy: { ultimaInteracaoEm: 'desc' },
+      include: { solicitacao: { select: { status: true } } },
     });
 
-    // Parada há mais de 24h → expira e recomeça do zero (não retoma o fluxo).
-    if (conversa && expirouPorInatividade(conversa.estado, conversa.ultimaInteracaoEm)) {
+    // Parada há mais de 24h → expira e recomeça do zero (não retoma o fluxo),
+    // salvo se a solicitação vinculada ainda está em curso (B5).
+    if (
+      conversa &&
+      !solicitacaoBloqueiaExpiracao(conversa.canal, conversa.solicitacao?.status) &&
+      expirouPorInatividade(conversa.estado, conversa.ultimaInteracaoEm)
+    ) {
       await this.prisma.conversa.update({
         where: { id: conversa.id },
         data: { estado: EstadoConversa.EXPIRADA, encerradaEm: new Date() },

@@ -10,7 +10,7 @@ import {
 
 import { PrismaService } from '../../../../shared/database/prisma/prisma.service';
 import { MESSAGING_PORT, MessagingPort } from '../../../whatsapp/domain/ports/messaging.port';
-import { expirouPorInatividade } from '../conversa-inatividade';
+import { expirouPorInatividade, solicitacaoBloqueiaExpiracao } from '../conversa-inatividade';
 import { ConversaDetalheDto } from '../dtos/conversa-response.dto';
 import { ObterConversaGestorUseCase } from './obter-conversa-gestor.use-case';
 
@@ -39,13 +39,22 @@ export class ResponderConversaUseCase {
         contatoExterno: true,
         instanciaCanalId: true,
         ultimaInteracaoEm: true,
+        solicitacao: { select: { status: true } },
       },
     });
     if (!conversa) {
       throw new NotFoundException('Conversa não encontrada.');
     }
-    // Parada há mais de 24h → expira por inatividade.
-    if (expirouPorInatividade(conversa.estado, conversa.ultimaInteracaoEm)) {
+    // B6 — o operador só responde conversas de WhatsApp (App/Web são automáticas).
+    if (conversa.canal !== CanalConversa.WHATSAPP) {
+      throw new BadRequestException('Só é possível responder conversas de WhatsApp.');
+    }
+    // Parada há mais de 24h → expira por inatividade, salvo se a solicitação
+    // vinculada ainda está em curso (B5).
+    if (
+      !solicitacaoBloqueiaExpiracao(conversa.canal, conversa.solicitacao?.status) &&
+      expirouPorInatividade(conversa.estado, conversa.ultimaInteracaoEm)
+    ) {
       await this.prisma.conversa.update({
         where: { id: conversa.id },
         data: { estado: EstadoConversa.EXPIRADA, encerradaEm: new Date() },

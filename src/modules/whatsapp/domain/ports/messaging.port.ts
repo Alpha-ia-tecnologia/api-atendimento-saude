@@ -34,6 +34,18 @@ export interface MensagemSaidaWhatsapp {
   texto: string;
 }
 
+/** Documento (PDF) a enviar ao solicitante — ex.: comprovante de agendamento. */
+export interface MensagemDocumentoWhatsapp {
+  /** Telefone destino, só dígitos. */
+  contato: string;
+  /** URL pública do documento (hospedado no nosso MinIO). */
+  documentoUrl: string;
+  /** Nome do arquivo exibido ao destinatário (ex.: "agendamento.pdf"). */
+  nomeArquivo: string;
+  /** Legenda opcional enviada junto do anexo. */
+  legenda?: string;
+}
+
 export interface ResultadoEnvio {
   /** Id da mensagem no provedor (status de entrega futuro), se informado. */
   idExterno: string | null;
@@ -47,6 +59,14 @@ export interface MessagingPort {
    * padrão global (`ativo: true`).
    */
   enviarTexto(msg: MensagemSaidaWhatsapp, instanciaId?: string | null): Promise<ResultadoEnvio>;
+  /**
+   * Envia um documento (PDF) pelo canal. Mesma resolução de instância do
+   * `enviarTexto` (informada ou padrão global).
+   */
+  enviarDocumento(
+    msg: MensagemDocumentoWhatsapp,
+    instanciaId?: string | null,
+  ): Promise<ResultadoEnvio>;
   /**
    * Converte um payload bruto de webhook (Evolution ou Meta — detectado pela
    * forma) em mensagens canônicas. Eventos que não são mensagem de usuário

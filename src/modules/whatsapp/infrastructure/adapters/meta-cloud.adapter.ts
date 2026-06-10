@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MinioService } from '../../../files/application/services/minio.service';
 import { MetaCredenciais } from '../../../integracoes/application/integracao.types';
 import {
+  MensagemDocumentoWhatsapp,
   MensagemEntrante,
   MensagemSaidaWhatsapp,
   ResultadoEnvio,
@@ -55,6 +56,38 @@ export class MetaCloudAdapter {
         to: msg.contato,
         type: 'text',
         text: { body: msg.texto },
+      }),
+    });
+    const json = (await resp.json().catch(() => null)) as {
+      messages?: { id?: string }[];
+      error?: { message?: string };
+    } | null;
+    if (!resp.ok) {
+      throw new Error(`Meta /messages falhou (HTTP ${resp.status}): ${json?.error?.message ?? ''}`);
+    }
+    return { idExterno: json?.messages?.[0]?.id ?? null };
+  }
+
+  async enviarDocumento(
+    cred: MetaCredenciais,
+    msg: MensagemDocumentoWhatsapp,
+  ): Promise<ResultadoEnvio> {
+    const url = `${MetaCloudAdapter.API}/${encodeURIComponent(cred.phoneNumberId)}/messages`;
+    const resp = await fetchComTimeout(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${cred.accessToken}`,
+      },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to: msg.contato,
+        type: 'document',
+        document: {
+          link: msg.documentoUrl,
+          filename: msg.nomeArquivo,
+          caption: msg.legenda,
+        },
       }),
     });
     const json = (await resp.json().catch(() => null)) as {

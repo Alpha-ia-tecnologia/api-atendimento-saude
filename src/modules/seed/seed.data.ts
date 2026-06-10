@@ -406,7 +406,7 @@ export function calcularPosicoes(): Record<string, { x: number; y: number }> {
  * seed de boot só re-sobrescreve o RASCUNHO quando a revisão muda (não atropela
  * edição manual a cada restart). O CLI (`forcar: true`) sempre sobrescreve.
  */
-export const SEED_FLUXO_REVISAO = '2026-06-09-layout-dagre';
+export const SEED_FLUXO_REVISAO = '2026-06-10-remove-no-enviar-pdf';
 
 const DESCRICAO_BASE = 'Fluxo seed do atendimento (consulta + exame).';
 const marcarRevisao = (rev: string): string => `${DESCRICAO_BASE} [seed:${rev}]`;
@@ -415,13 +415,17 @@ const revisaoDe = (descricao: string | null): string | null => {
   return m?.[1] ?? null;
 };
 
-/** Grava (replace-total) os nós/arestas/variáveis do seed numa versão. */
+/**
+ * Grava (replace-total) o grafo Web/App e as variáveis do seed numa versão.
+ * O canal WhatsApp não é semeado: quando vazio, reaproveita o desenho do
+ * Web/App em runtime.
+ */
 async function gravarConteudoFluxo(tx: Prisma.TransactionClient, versaoId: string): Promise<void> {
-  const posicoes = calcularPosicoes();
-
   await tx.fluxoAresta.deleteMany({ where: { fluxoVersaoId: versaoId } });
   await tx.fluxoNo.deleteMany({ where: { fluxoVersaoId: versaoId } });
   await tx.fluxoVariavel.deleteMany({ where: { fluxoVersaoId: versaoId } });
+
+  const posicoes = calcularPosicoes();
 
   const idPorChave = new Map<string, string>();
   for (const n of NOS) {

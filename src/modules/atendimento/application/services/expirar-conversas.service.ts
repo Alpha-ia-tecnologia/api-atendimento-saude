@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
-import { EstadoConversa } from '@prisma/client';
+import { CanalConversa, EstadoConversa, StatusSolicitacao } from '@prisma/client';
 
 import { PrismaService } from '../../../../shared/database/prisma/prisma.service';
 import { ESTADOS_ATIVOS, limiteInatividade } from '../conversa-inatividade';
@@ -35,6 +35,15 @@ export class ExpirarConversasService implements OnApplicationBootstrap, OnModule
         where: {
           estado: { in: ESTADOS_ATIVOS },
           ultimaInteracaoEm: { lt: limiteInatividade() },
+          // B5 — não expira conversa de WhatsApp com solicitação ainda em curso.
+          NOT: {
+            canal: CanalConversa.WHATSAPP,
+            solicitacao: {
+              is: {
+                status: { in: [StatusSolicitacao.SOLICITADA, StatusSolicitacao.EM_ATENDIMENTO] },
+              },
+            },
+          },
         },
         data: { estado: EstadoConversa.EXPIRADA, encerradaEm: new Date() },
       });

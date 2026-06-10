@@ -35,6 +35,7 @@ export class AssumirSolicitacaoUseCase {
       data: {
         status: StatusSolicitacao.EM_ATENDIMENTO,
         agenteResponsavelCrmId: operadorId,
+        assumidaEm: new Date(),
       },
       include: { especialidade: true, anexos: true, agenteResponsavel: true },
     });

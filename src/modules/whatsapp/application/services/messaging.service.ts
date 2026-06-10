@@ -9,6 +9,7 @@ import {
   MetaCredenciais,
 } from '../../../integracoes/application/integracao.types';
 import {
+  MensagemDocumentoWhatsapp,
   MensagemEntrante,
   MensagemSaidaWhatsapp,
   MessagingPort,
@@ -51,6 +52,16 @@ export class MessagingService implements MessagingPort {
     return provedor === ProvedorCanal.EVOLUTION
       ? this.evolution.enviarTexto(cred as EvolutionCredenciais, msg)
       : this.meta.enviarTexto(cred as MetaCredenciais, msg);
+  }
+
+  async enviarDocumento(
+    msg: MensagemDocumentoWhatsapp,
+    instanciaId?: string | null,
+  ): Promise<ResultadoEnvio> {
+    const { provedor, cred } = await this.resolverEnvio(instanciaId ?? null);
+    return provedor === ProvedorCanal.EVOLUTION
+      ? this.evolution.enviarDocumento(cred as EvolutionCredenciais, msg)
+      : this.meta.enviarDocumento(cred as MetaCredenciais, msg);
   }
 
   /**

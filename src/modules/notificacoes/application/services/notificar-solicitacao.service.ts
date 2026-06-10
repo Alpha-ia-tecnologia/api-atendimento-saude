@@ -11,6 +11,7 @@ import {
 } from '@prisma/client';
 
 import { PrismaService } from '../../../../shared/database/prisma/prisma.service';
+import { MinioService } from '../../../files/application/services/minio.service';
 import { MESSAGING_PORT, MessagingPort } from '../../../whatsapp/domain/ports/messaging.port';
 import { ExpoPushService } from './expo-push.service';
 
@@ -41,6 +42,7 @@ export class NotificarSolicitacaoService {
     private readonly prisma: PrismaService,
     @Inject(MESSAGING_PORT) private readonly messaging: MessagingPort,
     private readonly expoPush: ExpoPushService,
+    private readonly minio: MinioService,
   ) {}
 
   async solicitacaoCriada(s: SolicitacaoNotificavel): Promise<void> {
@@ -110,8 +112,13 @@ export class NotificarSolicitacaoService {
         where: { id: solicitacaoId },
         select: { agendamentoPdfUrl: true },
       });
-      const documentoUrl = solicitacao?.agendamentoPdfUrl;
-      if (!documentoUrl) return;
+      const pdfUrl = solicitacao?.agendamentoPdfUrl;
+      if (!pdfUrl) return;
+
+      // O provedor (Evolution/Meta) baixa o arquivo pela URL, então o bucket
+      // privado precisa de uma presigned URL — a URL crua daria 403/500 no
+      // fetch do provedor. Validade folgada (2h) p/ cobrir reentregas.
+      const documentoUrl = (await this.minio.assinarUrlDeArquivo(pdfUrl, 2 * 60 * 60)) ?? pdfUrl;
 
       const mensagem = MENSAGEM;
 
@@ -135,7 +142,9 @@ export class NotificarSolicitacaoService {
           autor: AutorMensagem.BOT,
           tipo: TipoMensagem.DOCUMENTO,
           conteudo: mensagem,
-          anexoUrl: documentoUrl,
+          // URL crua/estável no histórico (a presigned `documentoUrl` é só p/ o
+          // envio e expira); a tela assina sob demanda ao exibir.
+          anexoUrl: pdfUrl,
         },
       });
       await this.prisma.conversa.update({

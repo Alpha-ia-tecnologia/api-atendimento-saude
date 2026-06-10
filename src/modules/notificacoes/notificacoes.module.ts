@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { AuthMariaModule } from '../auth-maria/auth-maria.module';
+import { FilesModule } from '../files/files.module';
 import { WhatsappModule } from '../whatsapp/whatsapp.module';
 import { NotificacoesController } from './presentation/controllers/notificacoes.controller';
 import { ExpoPushService } from './application/services/expo-push.service';
@@ -16,7 +17,7 @@ import { RemoverDeviceTokenUseCase } from './application/use-cases/remover-devic
  * + envio pelo WhatsApp (MessagingPort).
  */
 @Module({
-  imports: [AuthMariaModule, WhatsappModule],
+  imports: [AuthMariaModule, WhatsappModule, FilesModule],
   controllers: [NotificacoesController],
   providers: [
     NotificarSolicitacaoService,

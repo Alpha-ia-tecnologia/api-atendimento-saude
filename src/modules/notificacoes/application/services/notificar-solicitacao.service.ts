@@ -110,7 +110,7 @@ export class NotificarSolicitacaoService {
 
       const solicitacao = await this.prisma.solicitacao.findUnique({
         where: { id: solicitacaoId },
-        select: { agendamentoPdfUrl: true },
+        select: { agendamentoPdfUrl: true, pacienteTelefoneWhatsapp: true },
       });
       const pdfUrl = solicitacao?.agendamentoPdfUrl;
       if (!pdfUrl) return;
@@ -122,16 +122,31 @@ export class NotificarSolicitacaoService {
 
       const mensagem = MENSAGEM;
 
+      // Envia o comprovante para os DOIS números (deduplicados): o do fluxo
+      // (paciente) e o que conversou pelo WhatsApp (solicitante).
+      const numeros = this.destinosWhatsapp(
+        solicitacao?.pacienteTelefoneWhatsapp,
+        conversa.contatoExterno,
+      );
+
       if (await this.messaging.disponivel()) {
-        await this.messaging.enviarDocumento(
-          {
-            contato: conversa.contatoExterno,
-            documentoUrl,
-            nomeArquivo: 'agendamento.pdf',
-            legenda: mensagem,
-          },
-          conversa.instanciaCanalId ?? undefined,
-        );
+        for (const contato of numeros) {
+          try {
+            await this.messaging.enviarDocumento(
+              {
+                contato,
+                documentoUrl,
+                nomeArquivo: 'agendamento.pdf',
+                legenda: mensagem,
+              },
+              conversa.instanciaCanalId ?? undefined,
+            );
+          } catch (err) {
+            this.logger.error(
+              `PDF do agendamento ${solicitacaoId} para ${contato} falhou: ${(err as Error).message}`,
+            );
+          }
+        }
       }
 
       // Registra a saída na conversa e bumpa ultimaInteracaoEm (@updatedAt).
@@ -188,7 +203,10 @@ export class NotificarSolicitacaoService {
         });
       }
 
-      if (conteudo.enviarWhatsapp && s.pacienteTelefoneWhatsapp) {
+      // Tenta o WhatsApp sempre que aplicável: o `enviarWhatsapp` resolve os
+      // destinos (telefone do fluxo + número da conversa) e retorna cedo se não
+      // houver nenhum.
+      if (conteudo.enviarWhatsapp) {
         await this.enviarWhatsapp(s, tipo, conteudo);
       }
     } catch (err) {
@@ -201,42 +219,48 @@ export class NotificarSolicitacaoService {
     tipo: TipoNotificacao,
     conteudo: { titulo: string; corpo: string },
   ): Promise<void> {
-    const contato = (s.pacienteTelefoneWhatsapp ?? '').replace(/\D/g, '');
-    if (!contato) return;
-
     // Quando a solicitação tem conversa de WhatsApp, envia pela MESMA instância
     // da conversa (a que o solicitante está usando), e não pela padrão global —
     // a padrão pode estar mal configurada e falhar (404/400). App/Web (sem
     // conversa) cai na instância padrão (instanciaId = undefined).
     const conversa = await this.prisma.conversa.findUnique({
       where: { solicitacaoId: s.id },
-      select: { canal: true, instanciaCanalId: true },
+      select: { canal: true, contatoExterno: true, instanciaCanalId: true },
     });
-    const instanciaId =
-      conversa?.canal === CanalConversa.WHATSAPP ? conversa.instanciaCanalId ?? undefined : undefined;
+    const ehConversaWhatsapp = conversa?.canal === CanalConversa.WHATSAPP;
+    const instanciaId = ehConversaWhatsapp ? conversa?.instanciaCanalId ?? undefined : undefined;
+
+    // Envia para os DOIS números (deduplicados): o digitado no fluxo (paciente)
+    // e o que conversou pelo WhatsApp (solicitante). O `contatoExterno` já vem
+    // em formato internacional válido; o do fluxo é normalizado (DDI 55).
+    const numeros = this.destinosWhatsapp(
+      s.pacienteTelefoneWhatsapp,
+      ehConversaWhatsapp ? conversa?.contatoExterno : null,
+    );
+    if (numeros.length === 0) return;
 
     let status: StatusNotificacao = StatusNotificacao.PENDENTE;
     let mensagemMsgId: string | null = null;
     let enviadoEm: Date | null = null;
 
     if (await this.messaging.disponivel()) {
-      try {
-        const { idExterno } = await this.messaging.enviarTexto(
-          {
-            contato,
-            texto: conteudo.corpo,
-          },
-          instanciaId,
-        );
-        status = StatusNotificacao.ENVIADA;
-        mensagemMsgId = idExterno;
-        enviadoEm = new Date();
-      } catch (err) {
-        status = StatusNotificacao.FALHA;
-        this.logger.error(
-          `WhatsApp da notificação ${s.protocolo} falhou: ${(err as Error).message}`,
-        );
+      let algumSucesso = false;
+      for (const contato of numeros) {
+        try {
+          const { idExterno } = await this.messaging.enviarTexto(
+            { contato, texto: conteudo.corpo },
+            instanciaId,
+          );
+          algumSucesso = true;
+          mensagemMsgId = mensagemMsgId ?? idExterno;
+        } catch (err) {
+          this.logger.error(
+            `WhatsApp da notificação ${s.protocolo} para ${contato} falhou: ${(err as Error).message}`,
+          );
+        }
       }
+      status = algumSucesso ? StatusNotificacao.ENVIADA : StatusNotificacao.FALHA;
+      enviadoEm = algumSucesso ? new Date() : null;
     }
 
     await this.prisma.notificacao.create({
@@ -260,5 +284,32 @@ export class NotificarSolicitacaoService {
 
   private primeiroNome(s: SolicitacaoNotificavel): string {
     return s.pacienteNome.split(' ').filter(Boolean)[0] ?? 'Olá';
+  }
+
+  /**
+   * Normaliza um telefone para o formato do WhatsApp (só dígitos, com DDI 55).
+   * Números digitados no fluxo costumam vir sem o 55 (DDD + número, 10/11
+   * dígitos) — sem o DDI o provedor não encontra o contato (exists:false).
+   */
+  private normalizarNumeroWhatsapp(valor: string | null | undefined): string {
+    const d = (valor ?? '').replace(/\D/g, '');
+    if (!d) return '';
+    if (d.startsWith('55') && (d.length === 12 || d.length === 13)) return d; // já tem DDI
+    if (d.length === 10 || d.length === 11) return `55${d}`; // DDD + número → prefixa DDI
+    return d;
+  }
+
+  /**
+   * Números de WhatsApp de destino (deduplicados, com DDI): o telefone digitado
+   * no fluxo (paciente) + o número que conversou pelo WhatsApp (solicitante).
+   * No caso "para mim" os dois coincidem e vira um envio só.
+   */
+  private destinosWhatsapp(telefoneFluxo?: string | null, contatoConversa?: string | null): string[] {
+    const set = new Set<string>();
+    for (const n of [contatoConversa, telefoneFluxo]) {
+      const norm = this.normalizarNumeroWhatsapp(n);
+      if (norm) set.add(norm);
+    }
+    return [...set];
   }
 }

@@ -72,7 +72,7 @@ export class MetricasDashboardDto {
   @ApiProperty({
     type: Number,
     nullable: true,
-    description: 'Tempo médio (em horas) de criação → realização.',
+    description: 'Tempo médio (em horas) de criação → aprovação.',
   })
   tempoMedioAtendimentoHoras!: number | null;
 

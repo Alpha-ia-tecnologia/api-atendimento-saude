@@ -59,12 +59,13 @@ export class ObterMetricasDashboardUseCase {
         GROUP BY 1
         ORDER BY 1
       `),
+      // Tempo médio de atendimento = criação → aprovação (aprovada_em - criado_em).
+      // Não existe estado "REALIZADA" no ciclo; ele termina em AGENDADA (aprovada_em).
       this.prisma.$queryRaw<{ horas: number | null }[]>(Prisma.sql`
-        SELECT (EXTRACT(EPOCH FROM AVG(data_realizada - criado_em)) / 3600)::float8 AS horas
+        SELECT (EXTRACT(EPOCH FROM AVG(aprovada_em - criado_em)) / 3600)::float8 AS horas
         FROM solicitacoes
-        WHERE status::text = 'REALIZADA'
-          AND data_realizada IS NOT NULL
-          AND data_realizada >= ${de} AND data_realizada <= ${ate} ${espCond}
+        WHERE aprovada_em IS NOT NULL
+          AND aprovada_em >= ${de} AND aprovada_em <= ${ate} ${espCond}
       `),
       this.prisma.$queryRaw<{ diaSemana: number; hora: number; total: number }[]>(Prisma.sql`
         SELECT EXTRACT(DOW FROM criado_em)::int AS "diaSemana",

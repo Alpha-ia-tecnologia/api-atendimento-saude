@@ -284,8 +284,15 @@ export class ProcessarWebhookWhatsappUseCase {
     instanciaCanalId: string | null,
   ): Promise<void> {
     for (const texto of this.renderizarPasso(passo)) {
+      await this.aguardarRitmoHumano();
       await this.enviarESalvar(conversaId, contato, texto, passo.noAtual, instanciaCanalId);
     }
+  }
+
+  /** Atraso humano antes de cada fala (1–2s aleatórios) — evita o efeito robótico. */
+  private async aguardarRitmoHumano(): Promise<void> {
+    const ms = 1000 + Math.floor(Math.random() * 1000); // [1000, 2000)
+    await new Promise((r) => setTimeout(r, ms));
   }
 
   /**

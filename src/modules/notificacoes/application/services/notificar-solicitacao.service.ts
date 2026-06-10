@@ -204,16 +204,30 @@ export class NotificarSolicitacaoService {
     const contato = (s.pacienteTelefoneWhatsapp ?? '').replace(/\D/g, '');
     if (!contato) return;
 
+    // Quando a solicitação tem conversa de WhatsApp, envia pela MESMA instância
+    // da conversa (a que o solicitante está usando), e não pela padrão global —
+    // a padrão pode estar mal configurada e falhar (404/400). App/Web (sem
+    // conversa) cai na instância padrão (instanciaId = undefined).
+    const conversa = await this.prisma.conversa.findUnique({
+      where: { solicitacaoId: s.id },
+      select: { canal: true, instanciaCanalId: true },
+    });
+    const instanciaId =
+      conversa?.canal === CanalConversa.WHATSAPP ? conversa.instanciaCanalId ?? undefined : undefined;
+
     let status: StatusNotificacao = StatusNotificacao.PENDENTE;
     let mensagemMsgId: string | null = null;
     let enviadoEm: Date | null = null;
 
     if (await this.messaging.disponivel()) {
       try {
-        const { idExterno } = await this.messaging.enviarTexto({
-          contato,
-          texto: conteudo.corpo,
-        });
+        const { idExterno } = await this.messaging.enviarTexto(
+          {
+            contato,
+            texto: conteudo.corpo,
+          },
+          instanciaId,
+        );
         status = StatusNotificacao.ENVIADA;
         mensagemMsgId = idExterno;
         enviadoEm = new Date();

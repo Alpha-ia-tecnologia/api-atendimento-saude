@@ -46,6 +46,9 @@ export class EvolutionAdapter {
     cred: EvolutionCredenciais,
     msg: MensagemSaidaWhatsapp,
   ): Promise<ResultadoEnvio> {
+    if (!msg.texto?.trim()) {
+      throw new Error('Evolution sendText: texto vazio.');
+    }
     const base = cred.baseUrl.replace(/\/+$/, '');
     const url = `${base}/message/sendText/${encodeURIComponent(cred.instance)}`;
     const headers = { 'Content-Type': 'application/json', apikey: cred.apiKey };
@@ -56,7 +59,11 @@ export class EvolutionAdapter {
       headers,
       body: JSON.stringify({ number: msg.contato, text: msg.texto }),
     });
+    // Guarda o erro da 1ª tentativa: se o fallback v1 também falhar, reportamos
+    // a causa real (v2) em vez do "requires property text" do formato antigo.
+    let erroV2 = '';
     if (resp.status === 400) {
+      erroV2 = await resp.text().catch(() => '');
       resp = await fetchComTimeout(url, {
         method: 'POST',
         headers,
@@ -65,7 +72,8 @@ export class EvolutionAdapter {
     }
     if (!resp.ok) {
       const corpo = await resp.text().catch(() => '');
-      throw new Error(`Evolution sendText falhou (HTTP ${resp.status}): ${corpo.slice(0, 200)}`);
+      const detalhe = erroV2 ? `${corpo.slice(0, 120)} | v2: ${erroV2.slice(0, 120)}` : corpo.slice(0, 200);
+      throw new Error(`Evolution sendText falhou (HTTP ${resp.status}): ${detalhe}`);
     }
     const json = (await resp.json().catch(() => null)) as { key?: { id?: string } } | null;
     return { idExterno: json?.key?.id ?? null };
